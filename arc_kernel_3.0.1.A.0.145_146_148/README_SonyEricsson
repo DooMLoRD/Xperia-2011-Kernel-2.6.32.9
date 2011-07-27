@@ -1,0 +1,6 @@
+Configuration files can be found in arch/arm/configs.
+
+Xperia PLAY => semc_zeus_defconfig
+Xperia arc => semc_anzu_defconfig
+Xperia neo => semc_hallon_defconfig
+

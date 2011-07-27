@@ -1,0 +1,9 @@
+obj-y += audio_dev_ctl.o snddev_data.o
+obj-$(CONFIG_TIMPANI_CODEC) += snddev_icodec.o
+obj-y += snddev_ecodec.o
+obj-y += apr.o apr_tal.o apr_tal_debug.o
+obj-y += q6asm.o q6adm.o q6afe.o
+obj-y += pcm_out.o pcm_in.o
+obj-y += q6voice.o
+obj-y += snddev_hdmi.o
+obj-y += aac_in.o qcelp_in.o evrc_in.o amrnb_in.o
