@@ -87,7 +87,19 @@ static struct cpufreq_frequency_table freq_table[] = {
 	{ 3, 768000 },
 	/* 806.4MHz is updated to 1024MHz at runtime for MSM8x55. */
 	{ 4, 806400 },
-	{ 5, CPUFREQ_TABLE_END },
+	{ 5, 1017600 },
+	{ 6, 1113600 },
+	{ 7, 1209600 },
+	{ 8, 1305600 },
+	{ 9, 1401600 },
+	{ 10, 1516800 },
+	{ 11, 1651200 },
+	{ 12, 1728000 },
+	{ 13, 1862400 },
+	//{ 14, 1900800 },
+	//{ 18, 1939200 },
+	//{ 19, 2016000 },
+	{ 14, CPUFREQ_TABLE_END },
 };
 
 /* Use negative numbers for sources that can't be enabled/disabled */
@@ -114,6 +126,18 @@ static struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	 * 806.4MHz is increased to match the SoC's capabilities at runtime
 	 */
 	{ 806400, PLL_2,    3, 0,  UINT_MAX, 1100, VDD_RAW(1100) },
+	{ 1017600, PLL_2,   3, 0,  UINT_MAX, 1150, VDD_RAW(1150) },
+	{ 1113600, PLL_2,   3, 0,  UINT_MAX, 1150, VDD_RAW(1150) },
+	{ 1209600, PLL_2,   3, 0,  UINT_MAX, 1150, VDD_RAW(1150) },
+	{ 1305600, PLL_2,   3, 0,  UINT_MAX, 1200, VDD_RAW(1200) },
+	{ 1401600, PLL_2,   3, 0,  UINT_MAX, 1250, VDD_RAW(1250) },
+	{ 1516800, PLL_2,   3, 0,  UINT_MAX, 1300, VDD_RAW(1300) },
+	{ 1651200, PLL_2,   3, 0,  UINT_MAX, 1300, VDD_RAW(1300) },
+	{ 1728000, PLL_2,   3, 0,  UINT_MAX, 1350, VDD_RAW(1350) },
+	{ 1862400, PLL_2,   3, 0,  UINT_MAX, 1450, VDD_RAW(1450) },
+	//{ 1900800, PLL_2,   3, 0,  UINT_MAX, 1450, VDD_RAW(1450) },
+	//{ 1939200, PLL_2,   3, 0,  192000, 1525, VDD_RAW(1525) },
+	//{ 2016000, PLL_2,   3, 0,  192000, 1550, VDD_RAW(1550) },
 	{ 0 }
 };
 
@@ -160,6 +184,11 @@ static void acpuclk_set_src(const struct clkctl_acpu_speed *s)
 	reg_clkctl |= s->acpu_src_sel << (4 + 8 * src_sel);
 	reg_clkctl |= s->acpu_src_div << (0 + 8 * src_sel);
 	writel(reg_clkctl, SCSS_CLK_CTL_ADDR);
+
+	/* Program PLL2 L val for overclocked speeds. */
+	if(s->src == PLL_2) {
+		writel(s->acpu_clk_khz/19200, PLL2_L_VAL_ADDR);
+	}
 
 	/* Toggle clock source. */
 	reg_clksel ^= 1;
@@ -387,8 +416,9 @@ void __init pll2_fixup(void)
 	cpu_freq = &freq_table[ARRAY_SIZE(freq_table)-2];
 
 	if (speed->acpu_clk_khz != 806400 || cpu_freq->frequency != 806400) {
-		pr_err("Frequency table fixups for PLL2 rate failed.\n");
-		BUG();
+		//pr_err("Frequency table fixups for PLL2 rate failed.\n");
+		//BUG();
+		return;
 	}
 
 	switch (pll2_l) {
