@@ -1,0 +1,1 @@
+ARCH=arm CROSS_COMPILE=arm-eabi- make doom_play_defconfig
