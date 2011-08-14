@@ -40,6 +40,35 @@ config IOSCHED_CFQ
 	  working environment, suitable for desktop systems.
 	  This is the default I/O scheduler.
 
+config IOSCHED_BFQ
+	tristate "BFQ I/O scheduler"
+	depends on EXPERIMENTAL
+	default n
+	---help---
+	  The BFQ I/O scheduler tries to distribute bandwidth among
+	  all processes according to their weights.
+	  It aims at distributing the bandwidth as desired, independently of
+	  the disk parameters and with any workload. It also tries to
+	  guarantee low latency to interactive and soft real-time
+	  applications.  If compiled built-in (saying Y here), BFQ can
+	  be configured to support hierarchical scheduling.
+
+config CGROUP_BFQIO
+	bool "BFQ hierarchical scheduling support"
+	depends on CGROUPS && IOSCHED_BFQ=y
+	default n
+	---help---
+	  Enable hierarchical scheduling in BFQ, using the cgroups
+	  filesystem interface.  The name of the subsystem will be
+	  bfqio.
+
+config IOSCHED_VR
+	tristate "V(R) I/O scheduler"
+	default n
+	---help---
+		Requests are chosen according to SSTF with a penalty of rev_penalty
+		for switching head direction.
+
 choice
 	prompt "Default I/O scheduler"
 	default DEFAULT_CFQ
@@ -59,6 +88,12 @@ choice
 	config DEFAULT_NOOP
 		bool "No-op"
 
+	config DEFAULT_BFQ
+		bool "BFQ" if IOSCHED_BFQ=y
+
+	config DEFAULT_VR
+		bool "V(R)" if IOSCHED_VR=y
+
 endchoice
 
 config DEFAULT_IOSCHED
@@ -66,7 +101,9 @@ config DEFAULT_IOSCHED
 	default "anticipatory" if DEFAULT_AS
 	default "deadline" if DEFAULT_DEADLINE
 	default "cfq" if DEFAULT_CFQ
+	default "bfq" if DEFAULT_BFQ
 	default "noop" if DEFAULT_NOOP
+	default "vr" if DEFAULT_VR
 
 endmenu
 
