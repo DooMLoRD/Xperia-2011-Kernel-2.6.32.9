@@ -1,0 +1,2 @@
+ARCH=arm CROSS_COMPILE=arm-eabi- make doom_mini_defconfig
+echo "MINI" > CURRENT_CONFIG

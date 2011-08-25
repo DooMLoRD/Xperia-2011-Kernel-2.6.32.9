@@ -24,3 +24,8 @@ Device   : Xperia Mini Pro
 Model No.: SK17
 Codename : mango
 
+[doom_mini_defconfig]
+Device   : Xperia Mini
+Model No.: ST15
+Codename : smultron
+
