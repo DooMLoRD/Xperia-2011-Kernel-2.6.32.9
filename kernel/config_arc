@@ -1,2 +1,3 @@
 ARCH=arm CROSS_COMPILE=arm-eabi- make doom_arc_defconfig
 echo "ARC" > CURRENT_CONFIG
+cat .version_ARC > .version

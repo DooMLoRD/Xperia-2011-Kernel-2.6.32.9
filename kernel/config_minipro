@@ -1,2 +1,3 @@
 ARCH=arm CROSS_COMPILE=arm-eabi- make doom_minipro_defconfig
 echo "MINI PRO" > CURRENT_CONFIG
+cat .version_MINIPRO > .version
