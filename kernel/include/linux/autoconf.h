@@ -1,7 +1,7 @@
 /*
  * Automatically generated C config: don't edit
  * Linux kernel version: 2.6.32.9
- * Wed Aug 31 01:32:29 2011
+ * Wed Aug 31 03:56:28 2011
  */
 #define AUTOCONF_INCLUDED
 #define CONFIG_MDDI_NOVATEK_PANEL_SHARP_LS042T3LX 1
@@ -672,6 +672,7 @@
 #define CONFIG_I2C 1
 #define CONFIG_CRYPTO_PCOMP 1
 #define CONFIG_NET_CLS_FLOW_MODULE 1
+#define CONFIG_CPU_FREQ_GOV_SMARTASS2 1
 #define CONFIG_ARM_THUMB 1
 #define CONFIG_INOTIFY_USER 1
 #define CONFIG_CRYPTO_CRC32C 1
