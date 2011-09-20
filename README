@@ -29,3 +29,5 @@ Device   : Xperia Mini
 Model No.: ST15
 Codename : smultron
 
+[doom_usbotg_mogami_defconfig]
+USB OTG MODULES for mogami board
