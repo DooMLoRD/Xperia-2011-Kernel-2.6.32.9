@@ -1,1 +1,1 @@
-ARCH=arm CROSS_COMPILE=/home/doomlord/android-ndk-r5c/toolchains/arm-eabi-4.4.0/prebuilt/linux-x86/bin/arm-eabi- make menuconfig
+ARCH=arm CROSS_COMPILE=/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi- make menuconfig

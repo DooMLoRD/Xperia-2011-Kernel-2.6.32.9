@@ -1,3 +1,3 @@
-ARCH=arm CROSS_COMPILE=arm-eabi- make doom_play_defconfig
+ARCH=arm CROSS_COMPILE=/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi- make doom_play_defconfig
 echo "PLAY" > CURRENT_CONFIG
 cat .version_PLAY > .version
