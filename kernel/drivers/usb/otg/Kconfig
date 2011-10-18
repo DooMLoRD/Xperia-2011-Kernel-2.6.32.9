@@ -105,4 +105,16 @@ config NOP_USB_XCEIV
 	 built-in with usb ip or which are autonomous and doesn't require any
 	 phy programming such as ISP1x04 etc.
 
+config USB_MSM_ACA_FORCE_DETECT_B_AS_A
+	bool "Forcibly recognize RID as ID_A, if detected ID_B"
+	depends on USB_MSM_ACA
+	default n
+	help
+	  The USB PHY may misrecognize RID, due to the limitation
+	  of the Qualcomm MSM chipset and the specification of the ACA.
+	  The threshold to recognize the RID has a problem and may recognize
+	  RID to not ID_A but ID_B depending on a charge current level.
+	  The case of using ID_B is rare and the main function of the ACA
+	  is ID_A, so forcibly recognize RID as ID_A, if detected ID_B.
+
 endif # USB || OTG

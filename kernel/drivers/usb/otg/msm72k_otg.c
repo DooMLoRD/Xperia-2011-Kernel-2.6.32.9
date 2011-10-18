@@ -196,6 +196,43 @@ static void disable_sess_valid(struct msm_otg *dev)
 	writel(readl(USB_OTGSC) & ~OTGSC_BSVIE, USB_OTGSC);
 }
 #ifdef CONFIG_USB_MSM_ACA
+#ifdef CONFIG_USB_MSM_ACA_FORCE_DETECT_B_AS_A
+static void set_aca_id_inputs(struct msm_otg *dev)
+{
+	u8		phy_ints;
+	int		is_id_a;
+
+	phy_ints = ulpi_read(dev, 0x13);
+
+	pr_debug("phy_ints = %x\n", phy_ints);
+	is_id_a = (int)test_bit(ID_A, &dev->inputs);
+	clear_bit(ID_A, &dev->inputs);
+	clear_bit(ID_B, &dev->inputs);
+	clear_bit(ID_C, &dev->inputs);
+	if (phy_id_state_a(phy_ints)) {
+		if (is_id_a) {
+			pr_debug("keep ID_A\n");
+			set_bit(ID_A, &dev->inputs);
+		} else {
+			pr_debug("ID_A set\n");
+			set_bit(ID_A, &dev->inputs);
+			set_bit(A_BUS_REQ, &dev->inputs);
+		}
+	} else if (phy_id_state_b(phy_ints)) {
+		if (is_id_a) {
+			pr_debug("detect ID_B, but keep ID_A\n");
+			set_bit(ID_A, &dev->inputs);
+		} else {
+			pr_debug("detect ID_B, but force set ID_A\n");
+			set_bit(ID_A, &dev->inputs);
+			set_bit(A_BUS_REQ, &dev->inputs);
+		}
+	} else if (phy_id_state_c(phy_ints)) {
+		pr_debug("ID_C set\n");
+		set_bit(ID_C, &dev->inputs);
+	}
+}
+#else
 static void set_aca_id_inputs(struct msm_otg *dev)
 {
 	u8		phy_ints;
@@ -218,6 +255,7 @@ static void set_aca_id_inputs(struct msm_otg *dev)
 		set_bit(ID_C, &dev->inputs);
 	}
 }
+#endif
 #define get_aca_bmaxpower(dev)		(dev->b_max_power)
 #define set_aca_bmaxpower(dev, power)	(dev->b_max_power = power)
 #else
@@ -539,9 +577,13 @@ static int msm_otg_set_power(struct otg_transceiver *xceiv, unsigned mA)
 		charge = pdata->vbus_drawable_ida;
 
 	pr_debug("Charging with %dmA current\n", charge);
-	/* Call vbus_draw only if the charger is of known type */
-	if (pdata->chg_vbus_draw && new_chg != USB_CHG_TYPE__INVALID)
-		pdata->chg_vbus_draw(charge);
+	/* Call vbus_draw only if the charger is of known type and also
+	 * ignore request to stop charging as a result of suspend interrupt
+	 * when wall-charger is used.
+	 */
+	if (pdata->chg_vbus_draw && new_chg != USB_CHG_TYPE__INVALID &&
+		(charge || new_chg != USB_CHG_TYPE__WALLCHARGER))
+			pdata->chg_vbus_draw(charge);
 
 	if (new_chg == USB_CHG_TYPE__WALLCHARGER) {
 		wake_lock(&dev->wlock);
@@ -2061,8 +2103,8 @@ static void msm_otg_sm_work(struct work_struct *w)
 				msleep(wait_left);
 			}
 #endif
-			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 			atomic_set(&dev->chg_type, USB_CHG_TYPE__SDP);
+			dev->pdata->vbus_power(USB_PHY_INTEGRATED, 0);
 			msm_otg_set_power(&dev->otg,
 					USB_IDCHG_MIN - get_aca_bmaxpower(dev));
 		} else if (!test_bit(ID, &dev->inputs)) {
@@ -2305,9 +2347,15 @@ static void msm_otg_id_func(unsigned long _dev)
 	if (phy_id_state_gnd(phy_ints))
 		goto out;
 
+#ifdef CONFIG_USB_MSM_ACA_FORCE_DETECT_B_AS_A
+	if ((test_bit(ID_A, &dev->inputs) ==
+		(phy_id_state_a(phy_ints) || phy_id_state_b(phy_ints))) &&
+	    (test_bit(ID_C, &dev->inputs) == phy_id_state_c(phy_ints))) {
+#else
 	if ((test_bit(ID_A, &dev->inputs) == phy_id_state_a(phy_ints)) &&
 	    (test_bit(ID_B, &dev->inputs) == phy_id_state_b(phy_ints)) &&
 	    (test_bit(ID_C, &dev->inputs) == phy_id_state_c(phy_ints))) {
+#endif
 		mod_timer(&dev->id_timer,
 				jiffies + msecs_to_jiffies(OTG_ID_POLL_MS));
 		goto out;

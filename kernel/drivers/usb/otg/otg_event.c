@@ -2,7 +2,7 @@
  *
  * OTG event handling function
  *
- * Copyright (C) 2010 Sony Ericsson Mobile Communications AB.
+ * Copyright (C) 2010, 2011 Sony Ericsson Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2, as
@@ -113,9 +113,9 @@ int otg_event_driver_register(struct otg_transceiver *xceiv)
 	}
 
 	if (xceiv->label)
-		strncpy(dev->name, xceiv->label, MAX_NAME_SIZE);
+		strlcpy(dev->name, xceiv->label, MAX_NAME_SIZE);
 	else
-		strncpy(dev->name, "Unknown", MAX_NAME_SIZE);
+		strlcpy(dev->name, "Unknown", MAX_NAME_SIZE);
 
 	dev->dev = device_create(dev->class, NULL, MKDEV(0, 0), NULL,
 					dev->name);

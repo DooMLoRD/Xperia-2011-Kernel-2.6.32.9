@@ -38,6 +38,7 @@
 #include <linux/pm_runtime.h>
 
 #include "msm_fb.h"
+#include "mdp4.h"
 
 
 #define MSM_AXI_QOS_DTV_ON     192000
@@ -114,6 +115,7 @@ static int dtv_off(struct platform_device *pdev)
 	pr_info("%s: tv_src_clk=%ldkHz, pm_qos_rate=%dkHz, [%d]\n", __func__,
 		tv_src_clk_default_rate/1000, PM_QOS_DEFAULT_VALUE, r);
 
+	mdp4_extn_disp = 0;
 	return ret;
 }
 
@@ -134,6 +136,8 @@ static int dtv_on(struct platform_device *pdev)
 
 	pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ , "dtv",
 						pm_qos_rate);
+	mdp_set_core_clk(1);
+	mdp4_extn_disp = 1;
 	mfd = platform_get_drvdata(pdev);
 
 	ret = clk_set_rate(tv_src_clk, mfd->fbi->var.pixclock);

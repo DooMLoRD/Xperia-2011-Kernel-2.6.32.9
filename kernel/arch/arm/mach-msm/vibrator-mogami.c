@@ -53,6 +53,7 @@ static const uint32_t pm_rpc_versions[] = {
 	0x30002,
 	0x30003,
 	0x30004,
+	0x30005,
 };
 
 static void set_pmic_vibrator(void)

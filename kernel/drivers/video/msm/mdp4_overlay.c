@@ -88,6 +88,8 @@ struct mdp4_overlay_ctrl {
 };
 
 static struct mdp4_overlay_ctrl *ctrl = &mdp4_overlay_db;
+static uint32 perf_level;
+static uint32 mdp4_del_res_rel;
 
 int mdp4_overlay_mixer_play(int mixer_num)
 {
@@ -1385,6 +1387,33 @@ int mdp4_overlay_get(struct fb_info *info, struct mdp_overlay *req)
 	return 0;
 }
 
+#define OVERLAY_VGA_SIZE	0x04B000
+#define OVERLAY_720P_SIZE	0x0E1000
+#define OVERLAY_720P_TILE_SIZE  0x0E6000
+#define OVERLAY_PERF_LEVEL1	1
+#define OVERLAY_PERF_LEVEL2	2
+#define OVERLAY_PERF_LEVEL3	3
+#define OVERLAY_PERF_LEVEL4	4
+
+#ifdef CONFIG_MSM_BUS_SCALING
+#define OVERLAY_BUS_SCALE_TABLE_BASE	6
+#endif
+
+static uint32 mdp4_overlay_get_perf_level(uint32 width, uint32 height,
+					  uint32 format)
+{
+	uint32 size_720p = OVERLAY_720P_SIZE;
+	if (format == MDP_Y_CRCB_H2V2_TILE ||
+		format == MDP_Y_CBCR_H2V2_TILE)
+		size_720p = OVERLAY_720P_TILE_SIZE;
+	if (width*height <= OVERLAY_VGA_SIZE)
+		return OVERLAY_PERF_LEVEL3;
+	else if (width*height <= size_720p)
+		return OVERLAY_PERF_LEVEL2;
+	else
+		return OVERLAY_PERF_LEVEL1;
+}
+
 int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
@@ -1420,16 +1449,28 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req)
 	pipe->flags = req->flags;
 
 	mdp4_stat.overlay_set[pipe->mixer_num]++;
-
+	
 	if (pipe->mixer_num == MDP4_MIXER0) {
 		mdp4_vg_qseed_init(pipe->mixer_num);
 	}
 
 	mdp4_stat.overlay_set[pipe->mixer_num]++;
-
+    perf_level = mdp4_overlay_get_perf_level(req->src.width,
+						req->src.height,
+						req->src.format);
+	mdp4_del_res_rel = 0;
 	up(&mfd->dma->ov_sem);
+    mdp_set_core_clk(perf_level);
 
 	return 0;
+}
+
+void  mdp4_overlay_resource_release(void)
+{
+	if (mdp4_del_res_rel) {
+		mdp_set_core_clk(OVERLAY_PERF_LEVEL4);
+		mdp4_del_res_rel = 0;
+	}
 }
 
 int mdp4_overlay_unset(struct fb_info *info, int ndx)
@@ -1467,9 +1508,12 @@ int mdp4_overlay_unset(struct fb_info *info, int ndx)
 #endif
 		mdp4_overlay_reg_flush(pipe, 0);
 
+	msleep(20);
 	mdp4_stat.overlay_unset[pipe->mixer_num]++;
 
 	mdp4_overlay_pipe_free(pipe);
+
+	mdp4_del_res_rel = 1;
 
 	up(&mfd->dma->ov_sem);
 

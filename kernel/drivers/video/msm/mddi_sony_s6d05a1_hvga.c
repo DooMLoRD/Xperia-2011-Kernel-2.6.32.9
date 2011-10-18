@@ -202,7 +202,7 @@ static void sony_lcd_dbc_on(void)
 		MDDI_DEBUG(LEVEL_PARAM, "dbc_ctrl = %d\n", dbc_ctrl);
 
 		/* Manual brightness */
-		write_client_reg_nbr(0x51, 0x000000FF, 0, 0, 0, 1);
+		write_client_reg_nbr(0x51, 0x000000FD, 0, 0, 0, 1);
 
 		/* Minimum Brightness */
 		write_client_reg_nbr(0x5E, 0x00000000, 0, 0, 0, 1);
@@ -333,10 +333,10 @@ static void sony_lcd_driver_init(struct platform_device *pdev)
 				0x15161C22, 0x00000003, 4);
 
 		/* MIECTRL */
-		write_client_reg_nbr(0xC0, 0x00108010, 0, 0, 0, 1);
+		write_client_reg_nbr(0xC0, 0x00108036, 0, 0, 0, 1);
 
 		/* BCMODE */
-		write_client_reg_nbr(0xC1, 0x00000012, 0, 0, 0, 1);
+		write_client_reg_nbr(0xC1, 0x00000013, 0, 0, 0, 1);
 
 		/* WRMIECTL */
 		write_client_reg_nbr(0xC2, 0x01000008, 0x010000DF,

@@ -32,6 +32,8 @@
 #include <linux/delay.h>
 #include <linux/cyttsp.h>
 #include "cyttsp_core.h"
+#include <linux/mutex.h>
+#include <linux/hrtimer.h>
 
 #define DBG(x)
 
@@ -47,6 +49,7 @@
 #define CY_SPI_DATA_SIZE  (CY_SPI_MAX_PACKET - CY_SPI_CMD_BYTES)
 #define CY_SPI_DATA_BUF_SIZE (CY_SPI_CMD_BYTES + CY_SPI_DATA_SIZE)
 #define CY_SPI_BITS_PER_WORD 8
+#define SPI_TIMEOUT 100
 
 struct cyttsp_spi {
 	struct cyttsp_bus_ops ops;
@@ -54,6 +57,9 @@ struct cyttsp_spi {
 	void *ttsp_client;
 	u8 wr_buf[CY_SPI_DATA_BUF_SIZE];
 	u8 rd_buf[CY_SPI_DATA_BUF_SIZE];
+	struct hrtimer timer;
+	struct mutex lock;
+	atomic_t timeout;
 };
 
 static int cyttsp_spi_xfer_(u8 op, struct cyttsp_spi *ts_spi,
@@ -107,7 +113,7 @@ static int cyttsp_spi_xfer_(u8 op, struct cyttsp_spi *ts_spi,
 	if (retval < 0) {
 		printk(KERN_ERR "%s: spi_sync() error %d\n",
 			__func__, retval);
-		retval = 0;
+		return retval;
 	}
 	if (op == CY_SPI_RD_OP) {
 		DBG(
@@ -121,11 +127,8 @@ static int cyttsp_spi_xfer_(u8 op, struct cyttsp_spi *ts_spi,
 				(rd_buf[i + 1] != CY_SPI_SYNC_ACK2)) {
 				continue;
 			}
-			if (i <= (CY_SPI_CMD_BYTES - 1)) {
-				memcpy(buf, (rd_buf + i + CY_SPI_SYNC_BYTES),
-					length);
-				return 0;
-			}
+			memcpy(buf, (rd_buf + i + CY_SPI_SYNC_BYTES), length);
+			return 0;
 		}
 		DBG(printk(KERN_INFO "%s: byte sync error\n", __func__);)
 		retval = -EAGAIN;
@@ -139,19 +142,32 @@ static int cyttsp_spi_xfer_(u8 op, struct cyttsp_spi *ts_spi,
 	return retval;
 }
 
+static enum hrtimer_restart watchdog(struct hrtimer *timer)
+{
+	struct cyttsp_spi *ts = container_of(timer,
+						struct cyttsp_spi, timer);
+	atomic_set(&ts->timeout, 1);
+	pr_info("%s: cyttsp_spi: timeout\n", __func__);
+	return HRTIMER_NORESTART;
+}
+
 static int cyttsp_spi_xfer(u8 op, struct cyttsp_spi *ts,
 			    u8 reg, u8 *buf, int length)
 {
-	int tries;
 	int rc;
 	DBG(printk(KERN_INFO "%s: Enter\n", __func__);)
 
-	for (tries = 0; tries < CY_NUM_RETRY; tries++) {
+	mutex_lock(&ts->lock);
+	atomic_set(&ts->timeout, 0);
+	hrtimer_start(&ts->timer, ktime_set(0, SPI_TIMEOUT * 1000000L),
+			HRTIMER_MODE_REL);
+	do {
 		rc = cyttsp_spi_xfer_(op, ts, reg, buf, length);
 		if (!rc || rc != -EAGAIN)
 			break;
-	}
-
+	} while (!atomic_read(&ts->timeout));
+	hrtimer_cancel(&ts->timer);
+	mutex_unlock(&ts->lock);
 	return rc;
 }
 
@@ -183,7 +199,6 @@ static s32 ttsp_spi_write_block_data(void *handle, u8 addr,
 	if (retval < 0)
 		printk(KERN_ERR "%s: ttsp_spi_write_block_data failed\n",
 			__func__);
-
 	return retval;
 }
 
@@ -224,7 +239,9 @@ static int __devinit cyttsp_spi_probe(struct spi_device *spi)
 		retval = -ENOMEM;
 		goto error_alloc_data_failed;
 	}
-
+	mutex_init(&ts_spi->lock);
+	hrtimer_init(&ts_spi->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	ts_spi->timer.function = watchdog;
 	ts_spi->spi_client = spi;
 	dev_set_drvdata(&spi->dev, ts_spi);
 	ts_spi->ops.write = ttsp_spi_write_block_data;

@@ -59,6 +59,7 @@ int libra_sdio_configure(sdio_irq_handler_t libra_sdio_rxhandler,
 	if (sdio_set_block_size(func, blksize)) {
 		printk(KERN_ERR "%s: Unable to set the block size.\n",
 				__func__);
+		sdio_release_host(func);
 		goto cfg_error;
 	}
 
@@ -127,19 +128,9 @@ EXPORT_SYMBOL(libra_sdio_deconfigure);
 
 int libra_enable_sdio_irq(struct sdio_func *func, u8 enable)
 {
-	if (libra_mmc_host) {
-		if (!enable) {
-			/*Disable SDIO IRQ */
-			libra_mmc_host->ops->enable_sdio_irq(libra_mmc_host, 0);
-
-			/*SDIO IRQ thread can re-enable the interrupt if card
-			capability is set as MMC_CAP_SDIO_IRQ. So disable that
-			as well */
-			libra_mmc_host->caps &= ~MMC_CAP_SDIO_IRQ;
-		} else {
-			libra_mmc_host->ops->enable_sdio_irq(libra_mmc_host, 1);
-			libra_mmc_host->caps |= MMC_CAP_SDIO_IRQ;
-		}
+	if (libra_mmc_host && libra_mmc_host->ops &&
+			libra_mmc_host->ops->enable_sdio_irq) {
+		libra_mmc_host->ops->enable_sdio_irq(libra_mmc_host, enable);
 		return 0;
 	}
 

@@ -72,9 +72,11 @@
 #include "socinfo.h"
 #include "cpufreq.h"
 #include <linux/usb/android_composite.h>
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+#include <linux/usb/f_accessory.h>
+#endif
 #include "pm.h"
 #include "spm.h"
-#include "keypad-pmic-mogami.h"
 #include <linux/msm_kgsl.h>
 #include <mach/dal_axi.h>
 #include <mach/msm_serial_hs.h>
@@ -112,6 +114,7 @@
 #define MSM_PMEM_SF_SIZE	0x500000
 #define MSM_FB_SIZE		0x500000
 #define MSM_GPU_PHYS_SIZE       SZ_2M
+#define MSM_PMEM_CAMERA_SIZE    0x2000000
 #define MSM_PMEM_ADSP_SIZE      0x1800000
 #define PMEM_KERNEL_EBI1_SIZE   0x600000
 #define MSM_PMEM_AUDIO_SIZE     0x200000
@@ -310,10 +313,6 @@ static struct mfd_cell pm8058_subdevs[] = {
 	{	.name = "pm8058-upl",
 		.id		= -1,
 	},
-	{	.name = KP_NAME,
-		.platform_data = &keypad_pmic_platform_data,
-		.data_size = sizeof(keypad_pmic_platform_data),
-	},
 };
 
 static struct pm8058_platform_data pm8058_7x30_data = {
@@ -333,9 +332,9 @@ static struct i2c_board_info pm8058_boardinfo[] __initdata = {
 
 static void msm_camera_vreg_enable(void)
 {
-	vreg_helper_on("gp15", 1200); // L22
-	vreg_helper_on("lvsw1", 1800); // LVS1
-	vreg_helper_on("gp2", 2800); // L11
+	vreg_helper_on("gp15", 1200); /* L22 */
+	vreg_helper_on("lvsw1", 1800); /* LVS1 */
+	vreg_helper_on("gp2", 2800); /* L11 */
 }
 
 static void msm_camera_vreg_disable(void)
@@ -495,6 +494,23 @@ struct msm_camera_device_platform_data msm_camera_device_data_ovm7692 = {
 	.ioclk.vfe_clk_rate  = 122880000,
 };
 
+struct msm_camera_device_platform_data msm_camera_device_data_mt9v114 = {
+	.camera_gpio_on = config_camera_on_gpios,
+	.camera_gpio_off = config_camera_off_gpios,
+	.ioext.mdcphy = MSM_MDC_PHYS,
+	.ioext.mdcsz  = MSM_MDC_SIZE,
+	.ioext.appphy = MSM_CLK_CTL_PHYS,
+	.ioext.appsz  = MSM_CLK_CTL_SIZE,
+	.ioext.camifpadphy = 0xAB000000,
+	.ioext.camifpadsz = 0x00000400,
+	.ioext.csiphy = 0xA6100000,
+	.ioext.csisz  = 0x00000400,
+	.ioext.csiirq = INT_CSI,
+	.ioclk.mclk_clk_rate = 19200000,
+	.ioclk.vfe_clk_rate  = 122880000,
+};
+
+
 
 #ifdef CONFIG_SEIX006
 static struct msm_camera_sensor_flash_data flash_seix006 = {
@@ -546,6 +562,31 @@ static struct platform_device msm_camera_sensor_ovm7692 = {
 };
 #endif /*CONFIG_OVM7692 ZEUS VGA VT CAMERA*/
 
+#ifdef CONFIG_MT9V114
+
+static struct msm_camera_sensor_flash_data flash_mt9v114_data = {
+	.flash_type = MSM_CAMERA_FLASH_NONE,
+	.flash_src  = 0
+};
+
+static struct msm_camera_sensor_info msm_camera_sensor_mt9v114_data = {
+	.sensor_name    = "mt9v114",
+	.sensor_reset   = 0,
+	.sensor_pwd     = 31,
+	.vcm_pwd        = 0,
+	.pdata          = &msm_camera_device_data_mt9v114,
+	.flash_data     = &flash_mt9v114_data,
+	.resource       = msm_camera_resources,
+	.num_resources  = ARRAY_SIZE(msm_camera_resources)
+};
+
+static struct platform_device msm_camera_sensor_mt9v114 = {
+	.name      = "msm_camera_mt9v114",
+	.dev       = {
+		.platform_data = &msm_camera_sensor_mt9v114_data,
+	},
+};
+#endif /*CONFIG_MT9V114 ZEUS VGA VT CAMERA*/
 
 static struct resource msm_gemini_resources[] = {
 	{
@@ -1135,8 +1176,16 @@ static char *usb_functions_diag[] = {
 	"diag",
 };
 
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+static char *usb_functions_accessory[] = { "accessory" };
+static char *usb_functions_accessory_adb[] = { "accessory", "adb" };
+#endif
+
 static char *usb_functions_all[] = {
 	"rndis",
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory",
+#endif
 	"usb_mass_storage",
 #if defined(CONFIG_USB_ANDROID_MTP_ARICENT)
 	"mtp",
@@ -1202,6 +1251,20 @@ static struct android_usb_product usb_products[] = {
 		.num_functions	= ARRAY_SIZE(usb_functions_msc_adb_eng),
 		.functions	= usb_functions_msc_adb_eng,
 	},
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	{
+		.vendor_id      = USB_ACCESSORY_VENDOR_ID,
+		.product_id     = USB_ACCESSORY_PRODUCT_ID,
+		.num_functions  = ARRAY_SIZE(usb_functions_accessory),
+		.functions      = usb_functions_accessory,
+	},
+	{
+		.vendor_id      = USB_ACCESSORY_VENDOR_ID,
+		.product_id     = USB_ACCESSORY_ADB_PRODUCT_ID,
+		.num_functions  = ARRAY_SIZE(usb_functions_accessory_adb),
+		.functions      = usb_functions_accessory_adb,
+	},
+#endif
 };
 
 static struct usb_mass_storage_platform_data mass_storage_pdata = {
@@ -1405,6 +1468,7 @@ static struct as3676_platform_led as3676_pdata_leds[] = {
 		.name = "lcd-backlight",
 		.sinks = BIT(AS3676_SINK_01),
 		.flags = AS3676_FLAG_ALS | AS3676_FLAG_PWM_INIT
+		| AS3676_FLAG_WAIT_RESUME
 			| AS3676_FLAG_DLS,
 		.max_current = 20000,
 		.default_brightness = LED_FULL,
@@ -1582,17 +1646,23 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 		.platform_data	= &gp2a_platform_data
 	},
 #ifdef CONFIG_SEIX006 /* zeus camera */
-    {
-        I2C_BOARD_INFO("seix006", 0x1A),
-        .type = "seix006"
-    },
-#endif // CONFIG_SEIX006
-#ifdef CONFIG_OVM7692 /* zeus vt camera */
-        {
-        I2C_BOARD_INFO("ovm7692", 0x3C),
-        .type = "ovm7692"
+	{
+		I2C_BOARD_INFO("seix006", 0x1A),
+		.type = "seix006"
 	},
-#endif // CONFIG_OVM7692
+#endif /* CONFIG_SEIX006 */
+#ifdef CONFIG_OVM7692 /* zeus vt camera */
+	{
+		I2C_BOARD_INFO("ovm7692", 0x3C),
+		.type = "ovm7692"
+	},
+#endif /* CONFIG_OVM7692 */
+#ifdef CONFIG_MT9V114 /* zeus vt camera version 2*/
+	{
+		I2C_BOARD_INFO("mt9v114", 0x3D),
+		.type = "mt9v114"
+	},
+#endif /* CONFIG_MT9V114 */
 };
 
 /* Driver(s) to be notified upon change in bdata */
@@ -1640,8 +1710,8 @@ static struct max17040_platform_data max17040_platform_data = {
 	},
 	.rcomp_data = {
 		.rcomp0 = 0x55,
-		.temp_co_hot = 1400,
-		.temp_co_cold = 9725,
+		.temp_co_hot = -1400,
+		.temp_co_cold = -9725,
 		.temp_div = 1000,
 	},
 	.chg_max_temp = 550,
@@ -1995,6 +2065,12 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.cached = 0,
 };
 
+static struct android_pmem_platform_data android_pmem_camera_pdata = {
+	.name = "pmem_camera",
+	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
+	.cached = 0,
+};
+
 static struct android_pmem_platform_data android_pmem_audio_pdata = {
 	.name = "pmem_audio",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
@@ -2011,6 +2087,12 @@ static struct platform_device android_pmem_adsp_device = {
 	.name = "android_pmem",
 	.id = 2,
 	.dev = {.platform_data = &android_pmem_adsp_pdata},
+};
+
+static struct platform_device android_pmem_camera_device = {
+	.name = "android_pmem",
+	.id = 3,
+	.dev = {.platform_data = &android_pmem_camera_pdata},
 };
 
 static struct platform_device android_pmem_audio_device = {
@@ -2541,6 +2623,7 @@ static struct platform_device *devices[] __initdata = {
 	&msm_rotator_device,
 	&android_pmem_kernel_ebi1_device,
 	&android_pmem_adsp_device,
+	&android_pmem_camera_device,
 	&android_pmem_audio_device,
 	&msm_device_i2c,
 	&msm_device_i2c_2,
@@ -2562,10 +2645,13 @@ static struct platform_device *devices[] __initdata = {
 	&msm_bt_power_device,
 #ifdef CONFIG_SEIX006
 	&msm_camera_sensor_seix006,
-#endif // CONFIG_SEIX006
+#endif /* CONFIG_SEIX006 */
 #ifdef CONFIG_OVM7692
 	&msm_camera_sensor_ovm7692,
-#endif // CONFIG_OVM7692
+#endif /* CONFIG_OVM7692 */
+#ifdef CONFIG_MT9V114
+	&msm_camera_sensor_mt9v114,
+#endif /* CONFIG_MT9V114 */
 	&zeus_wifi,
 	&novatek_device,
 #ifdef CONFIG_PMIC_TIME
@@ -3449,6 +3535,14 @@ static void __init pmem_adsp_size_setup(char **p)
 
 __early_param("pmem_adsp_size=", pmem_adsp_size_setup);
 
+static unsigned pmem_camera_size = MSM_PMEM_CAMERA_SIZE;
+static void __init pmem_camera_size_setup(char **p)
+{
+	pmem_camera_size = memparse(*p, p);
+}
+
+__early_param("pmem_camera_size=", pmem_camera_size_setup);
+
 static unsigned pmem_audio_size = MSM_PMEM_AUDIO_SIZE;
 static void __init pmem_audio_size_setup(char **p)
 {
@@ -3498,10 +3592,19 @@ static void __init msm7x30_allocate_memory_regions(void)
 	size = pmem_adsp_size;
 
 	if (size) {
-		addr = alloc_bootmem(size);
+		addr = __alloc_bootmem(size, 8*1024, __pa(MAX_DMA_ADDRESS));
 		android_pmem_adsp_pdata.start = __pa(addr);
 		android_pmem_adsp_pdata.size = size;
 		pr_info("allocating %lu bytes at %p (%lx physical) for adsp "
+			"pmem arena\n", size, addr, __pa(addr));
+	}
+
+	size = pmem_camera_size;
+	if (size) {
+		addr = alloc_bootmem(size);
+		android_pmem_camera_pdata.start = __pa(addr);
+		android_pmem_camera_pdata.size = size;
+		pr_info("allocating %lu bytes at %p (%lx physical) for camera "
 			"pmem arena\n", size, addr, __pa(addr));
 	}
 

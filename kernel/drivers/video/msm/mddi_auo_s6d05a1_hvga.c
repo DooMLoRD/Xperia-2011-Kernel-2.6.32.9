@@ -108,7 +108,7 @@ static void auo_lcd_window_address_set(enum lcd_registers reg,
 	write_client_reg_nbr(reg, para, 0, 0, 0, 1);
 }
 
-static uint32 reg_disctl[5] = {0x0803383B, 0x00080808, 0x00000808,
+static uint32 reg_disctl[5] = {0x08034E3B, 0x00080808, 0x00000808,
 			0x08540000, 0x00080808};
 
 static void auo_lcd_driver_init(void)

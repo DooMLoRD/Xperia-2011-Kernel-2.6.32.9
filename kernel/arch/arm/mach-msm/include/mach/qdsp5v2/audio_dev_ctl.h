@@ -76,6 +76,7 @@ struct msm_volume {
 
 extern struct msm_volume msm_vol_ctl;
 
+int msm_reset_all_device(void);
 void msm_snddev_register(struct msm_snddev_info *);
 void msm_snddev_unregister(struct msm_snddev_info *);
 int msm_snddev_devcount(void);

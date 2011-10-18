@@ -2265,9 +2265,9 @@ static int __msm_release(struct msm_sync *sync)
 		}
 		msm_queue_drain(&sync->pict_q, list_pict);
 
-#if defined(CONFIG_SEMC_CAMERA_MODULE) || defined(CONFIG_SEMC_SUB_CAMERA_MODULE)
+
 		wake_unlock(&sync->suspend_lock);
-#endif
+
 		wake_unlock(&sync->wake_lock);
 		sync->apps_id = NULL;
 		CDBG("%s: completed\n", __func__);
@@ -2700,9 +2700,9 @@ static int __msm_open(struct msm_sync *sync, const char *const apps_id)
 	sync->apps_id = apps_id;
 
 	if (!sync->opencnt) {
-#if defined(CONFIG_SEMC_CAMERA_MODULE) || defined(CONFIG_SEMC_SUB_CAMERA_MODULE)
+
 		wake_lock(&sync->suspend_lock);
-#endif
+
 		wake_lock(&sync->wake_lock);
 
 		msm_camvfe_fn_init(&sync->vfefn, sync);
@@ -2959,11 +2959,10 @@ static int msm_sync_init(struct msm_sync *sync,
 	msm_queue_init(&sync->pict_q, "pict");
 	msm_queue_init(&sync->vpe_q, "vpe");
 
-#if defined(CONFIG_SEMC_CAMERA_MODULE) || defined(CONFIG_SEMC_SUB_CAMERA_MODULE)
 	wake_lock_init(&sync->suspend_lock,
 			WAKE_LOCK_SUSPEND,
 			"msm_camera_suspend");
-#endif
+
 	wake_lock_init(&sync->wake_lock, WAKE_LOCK_IDLE, "msm_camera");
 
 	rc = msm_camio_probe_on(pdev);
@@ -2979,9 +2978,9 @@ static int msm_sync_init(struct msm_sync *sync,
 		pr_err("%s: failed to initialize %s\n",
 			__func__,
 			sync->sdata->sensor_name);
-#if defined(CONFIG_SEMC_CAMERA_MODULE) || defined(CONFIG_SEMC_SUB_CAMERA_MODULE)
+
 		wake_lock_destroy(&sync->suspend_lock);
-#endif
+
 		wake_lock_destroy(&sync->wake_lock);
 		return rc;
 	}
@@ -2994,9 +2993,8 @@ static int msm_sync_init(struct msm_sync *sync,
 
 static int msm_sync_destroy(struct msm_sync *sync)
 {
-#if defined(CONFIG_SEMC_CAMERA_MODULE) || defined(CONFIG_SEMC_SUB_CAMERA_MODULE)
 	wake_lock_destroy(&sync->suspend_lock);
-#endif
+
 	wake_lock_destroy(&sync->wake_lock);
 	return 0;
 }

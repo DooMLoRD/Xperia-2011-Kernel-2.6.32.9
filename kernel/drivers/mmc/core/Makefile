@@ -13,3 +13,5 @@ mmc_core-y			:= core.o bus.o host.o \
 				   sdio_cis.o sdio_io.o sdio_irq.o
 
 mmc_core-$(CONFIG_DEBUG_FS)	+= debugfs.o
+
+obj-$(CONFIG_MMC_SD_CHECK_BOOT_SIGNATURE)	+= sd_check_mbr.o

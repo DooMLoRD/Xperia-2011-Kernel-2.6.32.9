@@ -387,6 +387,18 @@ static int simple_remote_pf_enable_mic_bias(unsigned int enable);
 static int simple_remote_pf_enable_button_isr(unsigned int enable);
 #endif /* CONFIG_ACC_CONVERTER_SUPPORT */
 
+static inline int simple_remote_pf_get_real_gpio_state(void)
+{
+	u8 gpiovalue;
+
+	gpiovalue = gpio_get_value(loc_dat->jack_pf->headset_detect_read_pin);
+	if (loc_dat->jack_pf->invert_plug_det)
+		gpiovalue = !gpiovalue;
+
+	return gpiovalue;
+}
+
+
 #ifdef CONFIG_CRADLE_SUPPORT
 static int get_cradle_adc(uint *adc_value)
 {
@@ -410,13 +422,16 @@ static int get_cradle_adc(uint *adc_value)
  * the accessory that has been inserted into the cradle. */
 static void cradle_detect_work(struct work_struct *work)
 {
-	uint adc_val;
+	uint adc_val = 0;
+	u8 gpiovalue;
 
 	get_cradle_adc(&adc_val);
 
 	/* Detecting if cradle is connected. */
 
-	if (adc_val <= CRADLE_ADC_MAX && adc_val >= CRADLE_ADC_MIN) {
+	gpiovalue = simple_remote_pf_get_real_gpio_state();
+	if (adc_val <= CRADLE_ADC_MAX && adc_val >= CRADLE_ADC_MIN &&
+				!gpiovalue) {
 		dev_dbg(loc_dat->dev, "Cradle detected.\n");
 		loc_dat->cradle.dock_state = 1;
 		switch_set_state(&loc_dat->cradle.cradle_dev,
@@ -432,7 +447,7 @@ static void cradle_detect_work(struct work_struct *work)
 			loc_dat->cradle.detect_iterations++;
 			loc_dat->cradle.dock_state = 0;
 			switch_set_state(&loc_dat->cradle.cradle_dev,
-					 loc_dat->cradle.dock_state);
+					loc_dat->cradle.dock_state);
 			return;
 		}
 	}
@@ -505,9 +520,7 @@ static void acc_converter_work(struct work_struct *work)
 
 	/* We always need the real value here, so we don't use the supplied
 	 * function to get GPIO value. */
-	gpiovalue = gpio_get_value(loc_dat->jack_pf->headset_detect_read_pin);
-	if (loc_dat->jack_pf->invert_plug_det)
-		gpiovalue = !(gpiovalue);
+	gpiovalue = simple_remote_pf_get_real_gpio_state();
 
 #ifdef CONFIG_CRADLE_SUPPORT
 		dev_vdbg(loc_dat->dev,
@@ -681,9 +694,7 @@ static void acc_convert_irq_btn_det_work(struct work_struct *work)
 
 	/* We always need the real value here, so we don't use the supplied
 	 * function to get GPIO value. */
-	gpiovalue = gpio_get_value(loc_dat->jack_pf->headset_detect_read_pin);
-	if (loc_dat->jack_pf->invert_plug_det)
-		gpiovalue = !(gpiovalue);
+	gpiovalue = simple_remote_pf_get_real_gpio_state();
 
 	if (simple_remote_pf_read_hsd_adc(&adc_value)) {
 		dev_err(loc_dat->dev,
@@ -1168,9 +1179,7 @@ static int simple_remote_pf_get_current_plug_status(u8 *status)
 
 #endif /* CONFIG_ACC_CONVERTER_SUPPORT */
 
-	*status = gpio_get_value(loc_dat->jack_pf->headset_detect_read_pin);
-	if (loc_dat->jack_pf->invert_plug_det)
-		*status = !(*status);
+	*status = simple_remote_pf_get_real_gpio_state();
 
 	dev_dbg(loc_dat->dev,
 		"%s - Read GPIO status = %u\n", __func__, *status);

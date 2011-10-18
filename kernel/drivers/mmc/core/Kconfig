@@ -39,3 +39,14 @@ config MMC_SD_DETECT_CHATTERING
 	  This increases the duration of retrying the SD card
 	  detection in order to reduce the effects by the
 	  chattering of SD card detect pin.
+
+config MMC_SD_CHECK_BOOT_SIGNATURE
+	bool "Safety for uSD card short circuit"
+	default n
+	help
+	  If you say Y here, uSD driver checks boot signature
+	  in MBR when detecting uSD card.If boot signature(0xAA55)
+	  is invalid, uSD driver considers it as broken or
+	  unformatted card and turns SD_VDD off.This avoids
+	  abnormal behavior(e.g over current by short mode) with
+	  cracked uSD.

@@ -3,6 +3,7 @@
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
  * Copyright (c) 1999 Colin Van Dyke
+ * Copyright (C) 2011 Sony Ericsson Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -907,27 +908,39 @@ static const struct input_device_id joydev_blacklist[] = {
 		.evbit = { BIT_MASK(EV_KEY) },
 		.keybit = { [BIT_WORD(BTN_DIGI)] = BIT_MASK(BTN_DIGI) },
 	},	/* Avoid tablets, digitisers and similar devices */
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_DEVICE,
+		.bustype = BUS_USB,
+		.vendor = 0x045E,
+		.product = 0x0750,
+	},	/* Avoid Microsoft Wired Keyboard 600 */
 	{ }	/* Terminating entry */
 };
 
 static const struct input_device_id joydev_ids[] = {
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
-				INPUT_DEVICE_ID_MATCH_ABSBIT,
+				INPUT_DEVICE_ID_MATCH_ABSBIT |
+				INPUT_DEVICE_ID_MATCH_BUS,
 		.evbit = { BIT_MASK(EV_ABS) },
 		.absbit = { BIT_MASK(ABS_X) },
+		.bustype = BUS_USB,
 	},
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
-				INPUT_DEVICE_ID_MATCH_ABSBIT,
+				INPUT_DEVICE_ID_MATCH_ABSBIT |
+				INPUT_DEVICE_ID_MATCH_BUS,
 		.evbit = { BIT_MASK(EV_ABS) },
 		.absbit = { BIT_MASK(ABS_WHEEL) },
+		.bustype = BUS_USB,
 	},
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
-				INPUT_DEVICE_ID_MATCH_ABSBIT,
+				INPUT_DEVICE_ID_MATCH_ABSBIT |
+				INPUT_DEVICE_ID_MATCH_BUS,
 		.evbit = { BIT_MASK(EV_ABS) },
 		.absbit = { BIT_MASK(ABS_THROTTLE) },
+		.bustype = BUS_USB,
 	},
 	{ }	/* Terminating entry */
 };

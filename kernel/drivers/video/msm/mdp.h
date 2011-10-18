@@ -691,4 +691,5 @@ int mdp_debugfs_init(void);
 
 
 void mdp_dma_s_update(struct msm_fb_data_type *mfd);
+int mdp_set_core_clk(uint16 perf_level);
 #endif /* MDP_H */

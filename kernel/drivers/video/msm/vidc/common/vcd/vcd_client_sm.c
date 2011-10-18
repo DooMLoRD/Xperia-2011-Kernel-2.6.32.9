@@ -696,10 +696,24 @@ static u32 vcd_fill_output_buffer_cmn
 	struct vcd_buffer_entry *buf_entry;
 	u32 result = true;
 	u32 handled = true;
-
+	if (!cctxt || !buffer) {
+		VCD_MSG_ERROR("%s(): Inavlid params cctxt %p buffer %p",
+					__func__, cctxt, buffer);
+		return VCD_ERR_BAD_POINTER;
+	}
 	VCD_MSG_LOW("vcd_fill_output_buffer_cmn in %d:",
 		    cctxt->clnt_state.state);
-
+	if (cctxt->status.mask & VCD_IN_RECONFIG) {
+		buffer->time_stamp = 0;
+		buffer->data_len = 0;
+		VCD_MSG_LOW("In reconfig: Return output buffer");
+		cctxt->callback(VCD_EVT_RESP_OUTPUT_DONE,
+			VCD_S_SUCCESS,
+			buffer,
+			sizeof(struct vcd_frame_data),
+			cctxt, cctxt->client_data);
+		return rc;
+	}
 	buf_entry = vcd_check_fill_output_buffer(cctxt, buffer);
 	if (!buf_entry)
 		return VCD_ERR_BAD_POINTER;

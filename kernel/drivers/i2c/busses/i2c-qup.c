@@ -146,7 +146,6 @@ struct qup_i2c_dev {
 	int                          suspended;
 	int                          clk_state;
 	struct timer_list            pwr_timer;
-	unsigned int                 dummy;
 	struct mutex                 mlock;
 	void                         *complete;
 };

@@ -29,7 +29,7 @@
 #define STOP_SAFETY_TIMER_CURRENT_MA 40
 #define OVP_CHECK_TIME_S 1
 #define OVP_CHECK_DURATION_S 60
-#define OVERHEAT_COUNTER_MAX 3
+#define EXCEEDED_TEMP_COUNTER_MAX 3
 #define CURRENT_CONTROL_CHECK_TIME_S 1
 #define ALGORITHM_UPDATE_TIME_S 10
 
@@ -65,6 +65,7 @@ enum battery_chargalg_state {
 	BATT_ALG_STATE_WARM,
 	BATT_ALG_STATE_OVERHEAT,
 	BATT_ALG_STATE_FULL,
+	BATT_ALG_STATE_FAULT_COLD,
 	BATT_ALG_STATE_FAULT_OVERHEAT,
 	BATT_ALG_STATE_FAULT_SAFETY_TIMER,
 	BATT_ALG_STATE_FAULT_OVERVOLTAGE,
@@ -128,8 +129,8 @@ struct battery_chargalg_driver {
 	u8 ext_dependency_timeout_cnt;
 	u8 disable_algorithm;
 	u8 chg_connected;
-	u8 overheat_counter;
-	u8 overheat_counter_inactive;
+	u8 exceed_temp_counter;
+	bool exceed_temp_counter_inactive;
 	u8 current_control_counter;
 #ifdef CONFIG_BATTERY_CHARGALG_ENABLE_STEP_CHARGING
 	u8 step_charging_idx;
@@ -913,11 +914,12 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 	}
 
 	dev_dbg(alg->dev, "Enter state: %u, chg: %u, disable: %u, disable usb: "
-		"%u, eoc: %u, ovp: %u, timer: %u, temp: %d, overheat_cnt: %u\n",
+		"%u, eoc: %u, ovp: %u, timer: %u, temp: %d, "
+		"exceed_temp_cnt: %u\n",
 		alg->state, alg->chg_connected, alg->disable_algorithm,
 		alg->pdata->disable_usb_host_charging, alg->eoc.active,
 		alg->ovp.active, alg->safety_timer.expired, alg->batt_temp,
-		alg->overheat_counter);
+		alg->exceed_temp_counter);
 
 	if (!alg->chg_connected || !tlim || !vlim || alg->disable_algorithm ||
 	    ((alg->chg_connected & USB_CHG) &&
@@ -925,11 +927,12 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 		next_state = BATT_ALG_STATE_START;
 
 		/* When safety timer expires the timer resets when disconnecting
-		 * and connecting charger again. So the overheat counter.
+		 * and connecting charger again.
+		 * So the exceeded temperature counter.
 		 */
 		alg->safety_timer.expired = 0;
-		alg->overheat_counter = 0;
-		alg->overheat_counter_inactive = 0;
+		alg->exceed_temp_counter = 0;
+		alg->exceed_temp_counter_inactive = false;
 
 		if (alg->eoc.active) {
 			alg->eoc.active = 0;
@@ -950,11 +953,11 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 		next_state = BATT_ALG_STATE_FAULT_SAFETY_TIMER;
 	}
 
-	/* Reset overheat counter when charge cycle restarts */
+	/* Reset exceeded temperature counters when charge cycle restarts */
 	if (POWER_SUPPLY_STATUS_FULL == alg->batt_status &&
-	    alg->overheat_counter) {
-		alg->overheat_counter = 0;
-		alg->overheat_counter_inactive = 0;
+	    alg->exceed_temp_counter) {
+		alg->exceed_temp_counter = 0;
+		alg->exceed_temp_counter_inactive = false;
 	}
 
 	if (next_state != alg->state) {
@@ -983,9 +986,19 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 			next_state = BATT_ALG_STATE_OVERHEAT;
 		break;
 	case BATT_ALG_STATE_COLD:
-		if (alg->batt_temp > (tlim[BATTERY_CHARGALG_TEMP_COLD] +
-				       alg->pdata->temp_hysteresis_design))
+		if (!alg->exceed_temp_counter_inactive) {
+			alg->exceed_temp_counter_inactive = true;
+			if (++alg->exceed_temp_counter >=
+			    EXCEEDED_TEMP_COUNTER_MAX)
+				next_state = BATT_ALG_STATE_FAULT_COLD;
+		}
+
+		if (next_state != BATT_ALG_STATE_FAULT_COLD &&
+		    alg->batt_temp > (tlim[BATTERY_CHARGALG_TEMP_COLD] +
+				      alg->pdata->temp_hysteresis_design)) {
 			next_state = BATT_ALG_STATE_NORMAL;
+			alg->exceed_temp_counter_inactive = false;
+		}
 		break;
 	case BATT_ALG_STATE_NORMAL:
 		if (alg->batt_temp < tlim[BATTERY_CHARGALG_TEMP_COLD])
@@ -1005,9 +1018,10 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 			next_state = BATT_ALG_STATE_OVERHEAT;
 		break;
 	case BATT_ALG_STATE_OVERHEAT:
-		if (!alg->overheat_counter_inactive) {
-			alg->overheat_counter_inactive = 1;
-			if (++alg->overheat_counter >= OVERHEAT_COUNTER_MAX)
+		if (!alg->exceed_temp_counter_inactive) {
+			alg->exceed_temp_counter_inactive = true;
+			if (++alg->exceed_temp_counter >=
+			    EXCEEDED_TEMP_COUNTER_MAX)
 				next_state = BATT_ALG_STATE_FAULT_OVERHEAT;
 		}
 
@@ -1015,7 +1029,7 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 		    alg->batt_temp < (tlim[BATTERY_CHARGALG_TEMP_WARM] -
 				      alg->pdata->temp_hysteresis_design)) {
 			next_state = BATT_ALG_STATE_WARM;
-			alg->overheat_counter_inactive = 0;
+			alg->exceed_temp_counter_inactive = false;
 		}
 		break;
 	case BATT_ALG_STATE_FULL:
@@ -1058,6 +1072,7 @@ static void battery_chargalg_update_battery_health(
 	old_health = alg->batt_health;
 
 	switch (alg->state) {
+	case BATT_ALG_STATE_FAULT_COLD:
 	case BATT_ALG_STATE_COLD:
 		alg->batt_health = POWER_SUPPLY_HEALTH_COLD;
 		break;

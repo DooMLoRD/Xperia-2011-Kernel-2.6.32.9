@@ -75,6 +75,8 @@
 #define BMA250_MODE_SLEEP_500MS          0x5C
 #define BMA250_MODE_SLEEP_1000MS         0x5E
 #define BMA250_MODE_SUSPEND              0x80
+#define BMA250_MODE_LOWPOWER             0x40
+
 
 #define BMA250_RESET_REG                 0x14
 #define BMA250_RESET                     0xB6
@@ -119,6 +121,7 @@
 
 #define BMA250_INT_CTRL_REG              0x21
 #define BMA250_INT_RESET                 0x80
+#define BMA250_INT_MODE_LATCHED          0x0F
 
 #define BMA250_SLOPE_DUR                 0x27
 #define BMA250_SLOPE_THR                 0x28

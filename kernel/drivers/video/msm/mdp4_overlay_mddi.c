@@ -664,7 +664,7 @@ void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
 			complete(&mfd->pan_comp);
 		}
 	}
-
+	mdp4_overlay_resource_release();
 	up(&mfd->dma->ov_sem);
 }
 

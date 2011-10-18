@@ -239,6 +239,7 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 {
 	int ret;
 	int i;
+	int irq;
 	unsigned long irqflags;
 	struct gpio_event_input_info *di;
 	struct gpio_input_state *ds = *data;
@@ -247,16 +248,22 @@ int gpio_event_input_func(struct gpio_event_input_devs *input_devs,
 
 	if (func == GPIO_EVENT_FUNC_SUSPEND) {
 		if (ds->use_irq)
-			for (i = 0; i < di->keymap_size; i++)
-				disable_irq(gpio_to_irq(di->keymap[i].gpio));
+			for (i = 0; i < di->keymap_size; i++) {
+				irq = gpio_to_irq(di->keymap[i].gpio);
+				disable_irq(irq);
+				disable_irq_wake(irq);
+			}
 		hrtimer_cancel(&ds->timer);
 		return 0;
 	}
 	if (func == GPIO_EVENT_FUNC_RESUME) {
 		spin_lock_irqsave(&ds->irq_lock, irqflags);
 		if (ds->use_irq)
-			for (i = 0; i < di->keymap_size; i++)
-				enable_irq(gpio_to_irq(di->keymap[i].gpio));
+			for (i = 0; i < di->keymap_size; i++) {
+				irq = gpio_to_irq(di->keymap[i].gpio);
+				enable_irq(irq);
+				enable_irq_wake(irq);
+			}
 		hrtimer_start(&ds->timer, ktime_set(0, 0), HRTIMER_MODE_REL);
 		spin_unlock_irqrestore(&ds->irq_lock, irqflags);
 		return 0;

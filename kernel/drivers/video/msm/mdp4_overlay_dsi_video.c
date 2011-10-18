@@ -292,6 +292,6 @@ void mdp4_dsi_video_overlay(struct msm_fb_data_type *mfd)
 	mdp_disable_irq(MDP_OVERLAY0_TERM);
 
 	mdp4_stat.kickoff_dsi++;
-
+	mdp4_overlay_resource_release();
 	up(&mfd->dma->ov_sem);
 }

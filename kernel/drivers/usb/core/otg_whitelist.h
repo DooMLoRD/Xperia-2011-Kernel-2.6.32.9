@@ -2,6 +2,7 @@
  * drivers/usb/core/otg_whitelist.h
  *
  * Copyright (C) 2004 Texas Instruments
+ * Copyright (C) 2011 Sony Ericsson Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,6 +48,11 @@ static struct usb_device_id whitelist_table [] = {
 { USB_INTERFACE_INFO(USB_CLASS_HID, 1, 2), }, /* HID mouse */
 { USB_INTERFACE_INFO(USB_CLASS_HID, 1, 1), }, /* HID keyboard */
 { USB_INTERFACE_INFO(USB_CLASS_HID, 0, 0), }, /* HID gamepad */
+#endif
+
+#ifdef CONFIG_JOYSTICK_XPAD
+{ USB_INTERFACE_INFO(USB_CLASS_VENDOR_SPEC, 0x5d, 0x81), },
+{ USB_INTERFACE_INFO(USB_CLASS_VENDOR_SPEC, 0x5d, 0x01), },
 #endif
 
 { }	/* Terminating entry */

@@ -1088,7 +1088,7 @@ static void do_read_data(struct work_struct *work)
 packet_complete:
 	spin_lock_irqsave(&ept->read_q_lock, flags);
 	D("%s: take read lock on ept %p\n", __func__, ept);
-	wake_lock(&ept->read_q_wake_lock);
+	wake_lock_timeout(&ept->read_q_wake_lock, HZ*10);
 	list_add_tail(&pkt->list, &ept->read_q);
 	wake_up(&ept->wait_q);
 	spin_unlock_irqrestore(&ept->read_q_lock, flags);

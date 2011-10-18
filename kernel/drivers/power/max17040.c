@@ -40,7 +40,7 @@
 #define MAX17040_MODEL_DELAY	150 /* delay >= 150 */
 #define MAX17040_OCV_DELAY	300 /* delay = [150, 600] */
 
-#define MAX17040_TEMP_DEFAULT	250 /* 25.0C */
+#define MAX17040_TEMP_DEFAULT	200 /* 20.0C */
 #define MAX17040_TEMP_DIV	10
 #define MAX17040_RCOMP_MAX	0xFF
 #define MAX17040_RCOMP_MIN	0x00
@@ -301,7 +301,7 @@ static void max17040_update_rcomp(struct max17040_data *data)
 			data->pdata->rcomp_data.temp_co_cold /
 			data->pdata->rcomp_data.temp_div;
 
-	clamp(tmp, MAX17040_RCOMP_MIN, MAX17040_RCOMP_MAX);
+	tmp = clamp_val(tmp, MAX17040_RCOMP_MIN, MAX17040_RCOMP_MAX);
 
 	new_rcomp[0] = (u8) tmp;
 	new_rcomp[1] = 0;

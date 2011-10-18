@@ -601,6 +601,10 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 		      mmc_hostname(host->mmc), status);
 		data->error = -EIO;
 	}
+
+	/* Dummy CMD52 is not needed when CMD53 has errors */
+	if (host->plat->dummy52_required && host->dummy_52_needed)
+		host->dummy_52_needed = 0;
 }
 
 

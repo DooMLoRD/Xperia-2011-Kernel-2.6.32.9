@@ -24,11 +24,13 @@
 
 static struct msm_gemini_hw_pingpong fe_pingpong_buf;
 static struct msm_gemini_hw_pingpong we_pingpong_buf;
+static int we_pingpong_index;
 
 int msm_gemini_core_reset(uint8_t op_mode, void *base, int size)
 {
 	memset(&fe_pingpong_buf, 0, sizeof(fe_pingpong_buf));
 	fe_pingpong_buf.is_fe = 1;
+	we_pingpong_index = 0;
 	memset(&we_pingpong_buf, 0, sizeof(we_pingpong_buf));
 	msm_gemini_hw_reset(base, size);
 
@@ -43,6 +45,16 @@ int msm_gemini_core_reset(uint8_t op_mode, void *base, int size)
 	/* @todo wait for reset done irq */
 
 	return 0;
+}
+
+void msm_gemini_core_release(void)
+{
+	int i = 0;
+	for (i = 0; i < 2; i++) {
+		if (we_pingpong_buf.buf_status[i]) {
+			msm_gemini_platform_p2v(we_pingpong_buf.buf[i].file);
+		}
+	}
 }
 
 #if defined(CONFIG_SEMC_CAMERA_MODULE) || defined(CONFIG_SEMC_SUB_CAMERA_MODULE)
@@ -82,6 +94,8 @@ int msm_gemini_core_we_buf_update(struct msm_gemini_core_buf *buf)
 	GMN_DBG("%s:%d] 0x%08x 0x%08x %d\n", __func__, __LINE__,
 		(int) buf->y_buffer_addr, (int) buf->cbcr_buffer_addr,
 		buf->y_len);
+	we_pingpong_buf.buf_status[we_pingpong_index] = 0;
+	we_pingpong_index = (we_pingpong_index + 1)%2;
 	rc = msm_gemini_hw_pingpong_update(&we_pingpong_buf, buf);
 	return 0;
 }

@@ -1088,6 +1088,7 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 {
 	int touch_major;
 	int width_major;
+	struct synaptics_funcarea *funcarea = this->funcarea;
 	struct synaptics_button *button;
 	struct synaptics_pointer previous_pointer;
 	previous_pointer.funcarea = pointer->funcarea;
@@ -1110,6 +1111,14 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 	case SYN_FUNCAREA_INSENSIBLE:
 		LOG_EVENT(this, "insensible");
 		return 0;
+	case SYN_FUNCAREA_BOTTOM_EDGE:
+		LOG_EVENT(this, "bottom edge\n");
+		for (; funcarea->func != SYN_FUNCAREA_END; funcarea++) {
+			if (funcarea->func == SYN_FUNCAREA_POINTER) {
+				pointer->funcarea = funcarea;
+				break;
+			}
+		}
 	case SYN_FUNCAREA_POINTER:
 		synaptics_funcarea_crop(pointer->funcarea, &pointer->cur);
 		LOG_EVENT(this, "pointer %d (x,y)=(%d,%d) w=(%d,%d) z=%d\n",

@@ -44,6 +44,7 @@
 #include "mdp4.h"
 #endif
 
+uint32 mdp4_extn_disp;
 static struct clk *mdp_clk;
 static struct clk *mdp_pclk;
 
@@ -926,6 +927,32 @@ void mdp_hw_version(void)
 				__func__, mdp_hw_revision);
 }
 
+DEFINE_MUTEX(mdp_clk_lock);
+int mdp_set_core_clk(uint16 perf_level)
+{
+	int ret = -EINVAL;
+	if (mdp_clk && mdp_pdata
+		 && mdp_pdata->mdp_core_clk_table) {
+		if (perf_level > mdp_pdata->num_mdp_clk)
+			printk(KERN_ERR "%s invalid perf level\n", __func__);
+		else {
+			mutex_lock(&mdp_clk_lock);
+			if (mdp4_extn_disp)
+				perf_level = 1;
+			ret = clk_set_rate(mdp_clk,
+				mdp_pdata->
+				mdp_core_clk_table[mdp_pdata->num_mdp_clk
+						 - perf_level]);
+			mutex_unlock(&mdp_clk_lock);
+			if (ret) {
+				printk(KERN_ERR "%s unable to set mdp_core_clk rate\n",
+					__func__);
+			}
+		}
+	}
+	return ret;
+}
+
 static int mdp_irq_clk_setup(void)
 {
 	int ret;
@@ -1212,6 +1239,7 @@ static int mdp_probe(struct platform_device *pdev)
 
 
 	pdev_list[pdev_list_cnt++] = pdev;
+	mdp4_extn_disp = 0;
 	return 0;
 
       mdp_probe_err:

@@ -33,6 +33,15 @@ config OVM7692
 	---help---
 	  Omnivision VGA fixed focus sensor
 
+config MT9V114
+    bool "Sensor mt9v114"
+	depends on MSM_CAMERA
+	---help---
+	  AAC/Heptagon VGA fixed focus sensor
+#	Used as front sensor
+#	Uses parallel interface
+#	Previously known as Hydrogen
+
 config WEBCAM_OV7692
 	bool "Sensor OV7692 (VGA YUV)"
 	depends on MSM_CAMERA && ARCH_MSM8X60

@@ -1410,6 +1410,13 @@ config CRASH_NOTES_VM
 	  This will extend the crash_notes by adding information about the
 	  virtual memory setup (start address and if it's sparse or flatmem).
 
+config CONSOLE_CONTROL
+	bool "Export console_control interface"
+	default n
+	help
+	  Export console_control interface, in order to dynamically control whether
+	  printk output to uart console.
+
 config ATAGS_PROC
 	bool "Export atags in procfs"
 	depends on KEXEC

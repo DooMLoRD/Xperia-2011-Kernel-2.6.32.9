@@ -358,6 +358,6 @@ void mdp4_dtv_overlay(struct msm_fb_data_type *mfd)
 
 		mdp4_stat.kickoff_dtv++;
 	}
-
+	mdp4_overlay_resource_release();
 	up(&mfd->dma->ov_sem);
 }

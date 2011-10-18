@@ -186,6 +186,15 @@ config MACH_SEMC_ZEUS
 	help
 	  Support for the SonyEricsson Zeus devices.
 
+config MACH_SEMC_MOGAMI
+       depends on ARCH_MSM7X30
+       depends on !MSM_STACKED_MEMORY
+       select TI1271
+       default y
+       bool "SonyEricsson Mogami CDB"
+       help
+         Support for the SonyEricsson Mogami CDB (development board).
+
 config MACH_SEMC_ANZU
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
@@ -236,6 +245,16 @@ config MACH_SEMC_SMULTRON
 	help
 	  Support for the SonyEricsson Smultron devices.
 
+config MACH_SEMC_SATSUMA
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select TI1271 if !CAPTURE_KERNEL
+	select SUPPORT_ALIEN_USB_CHARGER
+	default y
+	bool "SonyEricsson Satsuma"
+	help
+	  Support for the SonyEricsson Satsuma devices.
+
 config MACH_SEMC_MANGO
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
@@ -244,6 +263,15 @@ config MACH_SEMC_MANGO
 	bool "SonyEricsson Mango"
 	help
 	  Support for the SonyEricsson Mango devices.
+
+config MACH_SEMC_COCONUT
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select TI1271
+	default n
+	bool "SonyEricsson Coconut"
+	help
+	  Support for the SonyEricsson Coconut devices.
 
 config MACH_SEMC_AKANE
 	depends on ARCH_MSM7X30
@@ -264,6 +292,16 @@ config MACH_SEMC_AZUSA
 	bool "SonyEricsson Azusa"
 	help
 	  Support for the SonyEricsson Azusa devices.
+
+config MACH_SEMC_HAIDA
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select TI1271
+	select SUPPORT_ALIEN_USB_CHARGER
+	default y
+	bool "SonyEricsson Haida"
+	help
+	  Support for the SonyEricsson Haida devices.
 
 config MACH_SAPPHIRE
 	depends on ARCH_MSM7X01A

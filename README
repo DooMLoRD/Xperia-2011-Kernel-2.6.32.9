@@ -4,6 +4,8 @@ Common repo for SE Xperia 2011 Devices
 kernel configs:
 ---------------
 
+new 4.0.1.A.0.284 defconfigs updated for:
+
 [doom_arc_defconfig]
 Device   : Xperia Arc
 Model No.: LT15
@@ -18,6 +20,9 @@ Codename : zeus
 Device   : Xperia Neo
 Model No.: MT15
 Codename : hallon
+
+
+still remaining:
 
 [doom_minipro_defconfig]
 Device   : Xperia Mini Pro
@@ -34,6 +39,4 @@ Device   : Xperia Ray
 Model No.: ST18
 Codename : urushi
 
-[doom_usbotg_mogami_defconfig]
-USB OTG MODULES for mogami board
 

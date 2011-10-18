@@ -864,6 +864,13 @@ config USB_CSW_HACK
 	 This csw hack feature is for increasing the performance of the mass
 	 storage
 
+config USB_KDDI_SCSI_EXTENSIONS
+	boolean "SCSI Command Extenstion for KDDI Device"
+	depends on USB_ANDROID_MASS_STORAGE
+	default n
+	help
+	 The mass storage extension to communicate with KDDI application.
+
 config USB_MARLIN_SCSI_EXTENSIONS
 	boolean "SCSI Command Extenstion for Marlin Device"
 	depends on USB_ANDROID_MASS_STORAGE
@@ -887,6 +894,12 @@ config USB_ANDROID_RNDIS_WCEIS
 
          If you enable this option, the device is no longer CDC ethernet
          compatible.
+
+config USB_ANDROID_ACCESSORY
+	boolean "Android USB accessory function"
+	depends on USB_ANDROID
+	help
+	  Provides Android USB Accessory support for android gadget driver.
 
 config USB_ANDROID_RMNET
 	boolean "RmNet function driver"

@@ -23,6 +23,8 @@
 #include <mach/qdsp5v2/snddev_icodec.h>
 #ifdef CONFIG_MACH_SEMC_ZEUS
 #include <mach/qdsp5v2/marimba_profile_zeus.h>
+#elif defined(CONFIG_MACH_SEMC_COCONUT)
+#include <mach/qdsp5v2/marimba_profile_coconut.h>
 #else
 #include <mach/qdsp5v2/marimba_profile_platform.h>
 #endif

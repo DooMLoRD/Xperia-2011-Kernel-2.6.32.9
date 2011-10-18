@@ -18,6 +18,11 @@
 #include <linux/input.h>
 #include <linux/gpio_event.h>
 #include <linux/platform_device.h>
+#include <linux/mfd/pmic8058.h>
+
+#define PM8058_GPIO_PM_TO_SYS(pm_gpio)	(pm_gpio + NR_GPIO_IRQS)
+#define PM8058_GPIO_SYS_TO_PM(sys_gpio)	(sys_gpio - NR_GPIO_IRQS)
+
 
 static struct gpio_event_direct_entry keypad_zeus_gpio_map[] = {
 	{ 19, BTN_TL},
@@ -36,6 +41,17 @@ static struct gpio_event_direct_entry keypad_zeus_gpio_map[] = {
 	{101, KEY_UP},
 	{100, KEY_LEFT},
 	{102, KEY_DOWN}
+};
+
+static struct gpio_event_direct_entry keypad_zeus_pmic_gpio_map_nwake[] = {
+	{ PM8058_GPIO_PM_TO_SYS(17 - 1), KEY_BACK },
+	{ PM8058_GPIO_PM_TO_SYS(18 - 1), KEY_MENU },
+	{ PM8058_GPIO_PM_TO_SYS(26 - 1), KEY_SEARCH },
+};
+
+static struct gpio_event_direct_entry keypad_zeus_pmic_gpio_map_wake[] = {
+	{ PM8058_GPIO_PM_TO_SYS(19 - 1), KEY_HOME },
+	{ PM8058_GPIO_PM_TO_SYS(31 - 1), KEY_VENDOR },
 };
 
 static const struct gpio_event_direct_entry switch_zeus_gpio_map[] = {

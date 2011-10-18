@@ -28,7 +28,12 @@ struct android_usb_function {
 };
 
 struct android_usb_product {
-	/* Default product ID. */
+	/* Vendor ID for this set of functions.
+	 * Default vendor_id in platform data will be used if this is zero.
+	 */
+	__u16 vendor_id;
+
+	/* Product ID for this set of functions. */
 	__u16 product_id;
 
 	/* List of function names associated with this product.
@@ -71,6 +76,12 @@ struct android_usb_platform_data {
 	char **functions;
 };
 
+/* EUI-64 identifier format for Device Identification VPD page */
+struct eui64_id {
+	u8 ieee_company_id[3];
+	u8 vendor_specific_ext_field[5];
+};
+
 /* Platform data for "usb_mass_storage" driver. */
 struct usb_mass_storage_platform_data {
 	/* Contains values for the SC_INQUIRY SCSI command. */
@@ -88,6 +99,9 @@ struct usb_mass_storage_platform_data {
 
 	/* number of CD-ROM LUNS */
 	int cdrom_nluns;
+
+	char *serial_number;
+	struct eui64_id eui64_id;
 };
 
 /* Platform data for USB ethernet driver. */

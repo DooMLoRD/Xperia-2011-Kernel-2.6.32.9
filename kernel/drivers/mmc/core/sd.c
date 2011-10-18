@@ -22,6 +22,10 @@
 #include "mmc_ops.h"
 #include "sd_ops.h"
 
+#ifdef CONFIG_MMC_SD_CHECK_BOOT_SIGNATURE
+#include "sd_check_mbr.h"
+#endif
+
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -794,6 +798,13 @@ int mmc_attach_sd(struct mmc_host *host, u32 ocr)
 	err = mmc_sd_init_card(host, host->ocr, NULL);
 	if (err)
 		goto err;
+#endif
+
+#ifdef CONFIG_MMC_SD_CHECK_BOOT_SIGNATURE
+	if (mmc_sd_check_boot_signature(host->card)) {
+		err = -EFAULT;
+		goto err;
+	}
 #endif
 
 	mmc_release_host(host);

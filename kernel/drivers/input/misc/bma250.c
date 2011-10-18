@@ -211,6 +211,7 @@ struct driver_data {
 	struct bma250_cnf            new_cnf;
 	struct bma250_cnf            cur_cnf;
 	bool                         power;
+	bool                         irq_pending;
 };
 
 static struct mutex               bma250_power_lock;
@@ -755,8 +756,12 @@ static int  bma250_power_down(struct driver_data *dd)
 
 	mutex_lock(&bma250_power_lock);
 
-	rc = bma250_ic_write(dd->ic_dev, BMA250_MODE_CTRL_REG,
+	if (!dd->ip_dev->users)
+		rc = bma250_ic_write(dd->ic_dev, BMA250_MODE_CTRL_REG,
 				BMA250_MODE_SUSPEND);
+	else
+		rc = bma250_ic_write(dd->ic_dev, BMA250_MODE_CTRL_REG,
+				BMA250_MODE_LOWPOWER);
 	dd->power = false;
 	cancel_delayed_work(&dd->work_data);
 
@@ -782,7 +787,7 @@ static int  bma250_power_up(struct driver_data *dd)
 	return rc;
 }
 
-static int __devinit bma250_config(struct driver_data *dd)
+static int bma250_config(struct driver_data *dd)
 {
 	int                 rc;
 	u8                  rx_buf[2];
@@ -823,47 +828,17 @@ static int __devinit bma250_config(struct driver_data *dd)
 			goto config_exit;
 	}
 
+	rc = bma250_ic_write(dd->ic_dev, BMA250_INT_CTRL_REG,
+						BMA250_INT_MODE_LATCHED);
+	if (rc)
+		goto config_exit;
+
 	rc = bma250_update_settings(dd);
 
 config_exit:
 
 	return rc;
 }
-
-#ifdef CONFIG_SUSPEND
-static int bma250_suspend(struct device *dev)
-{
-	struct driver_data *dd = dev_get_drvdata(dev);
-
-	bma250_power_down(dd);
-	if (dd->ip_dev->users)
-		disable_irq(dd->ic_dev->irq);
-	if (dd->pdata && dd->pdata->teardown)
-		dd->pdata->teardown(&dd->ic_dev->dev);
-
-	return 0;
-}
-
-static int bma250_resume(struct device *dev)
-{
-	struct driver_data *dd = dev_get_drvdata(dev);
-	int rc;
-
-	if (dd->pdata && dd->pdata->setup) {
-		rc = dd->pdata->setup(&dd->ic_dev->dev);
-		if (rc)
-			return rc;
-	}
-
-	rc = bma250_config(dd);
-	if (rc)
-		return rc;
-
-	if (dd->ip_dev->users)
-		enable_irq(dd->ic_dev->irq);
-	return rc;
-}
-#endif
 
 static inline int bma250_report_data(struct driver_data *dd)
 {
@@ -901,6 +876,44 @@ report_error:
 	return rc;
 }
 
+#ifdef CONFIG_SUSPEND
+static int bma250_suspend(struct device *dev)
+{
+	struct driver_data *dd = dev_get_drvdata(dev);
+
+	bma250_power_down(dd);
+	if (dd->pdata && dd->pdata->teardown)
+		dd->pdata->teardown(&dd->ic_dev->dev);
+
+	return 0;
+}
+
+static int bma250_resume(struct device *dev)
+{
+	struct driver_data *dd = dev_get_drvdata(dev);
+	int rc;
+
+	if (dd->pdata && dd->pdata->setup) {
+		rc = dd->pdata->setup(&dd->ic_dev->dev);
+		if (rc)
+			return rc;
+	}
+
+	rc = bma250_config(dd);
+	if (rc)
+		return rc;
+
+	if (dd->irq_pending) {
+		dd->irq_pending= false;
+		rc = bma250_report_data(dd);
+		if (rc)
+			return rc;
+	}
+
+	return rc;
+}
+#endif
+
 static void bma250_work_f(struct work_struct *work)
 {
 	int                         rc;
@@ -934,7 +947,10 @@ static irqreturn_t bma250_irq(int irq, void *dev_id)
 			goto irq_error;
 
 		rc = bma250_update_settings(dd);
+	} else {
+		dd->irq_pending = true;
 	}
+
 irq_error:
 	mutex_unlock(&bma250_power_lock);
 	return IRQ_HANDLED;
@@ -954,13 +970,36 @@ static int bma250_open(struct input_dev *dev)
 				  IRQF_TRIGGER_RISING,
 				  BMA250_NAME,
 				  &dd->ic_dev->dev);
+
+	rc = set_irq_wake(dd->ic_dev->irq, 1);
+	if (rc) {
+		dev_err(&dd->ic_dev->dev,
+			"%s: set_irq_wake failed with error %d\n",
+			__func__,rc);
+		goto probe_err_wake_irq;
+	}
+
+	rc = bma250_update_settings(dd);
+	if (rc)
+		goto probe_err_wake_irq;
+
 	return rc;
+
+probe_err_wake_irq:
+	free_irq(dd->ic_dev->irq, &dd->ic_dev->dev);
+	return rc;
+
 }
 
 static void bma250_release(struct input_dev *dev)
 {
+	int                 rc;
 	struct driver_data *dd = input_get_drvdata(dev);
-
+	rc = set_irq_wake(dd->ic_dev->irq, 0);
+	if (rc)
+		dev_err(&dd->ic_dev->dev,
+			"%s: set_irq_wake failed with error %d\n",
+			__func__, rc);
 	free_irq(dd->ic_dev->irq, &dd->ic_dev->dev);
 }
 

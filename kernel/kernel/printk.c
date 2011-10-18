@@ -1199,6 +1199,15 @@ EXPORT_SYMBOL(console_stop);
 
 void console_start(struct console *console)
 {
+/*
+ * If enable console_control feature and console is disabled
+ * in console_control module, it doesn't be permitted to enable
+ * console in other modules.
+ */
+#ifdef CONFIG_CONSOLE_CONTROL
+	if (console_value == 0)
+		return;
+#endif
 	acquire_console_sem();
 	console->flags |= CON_ENABLED;
 	release_console_sem();

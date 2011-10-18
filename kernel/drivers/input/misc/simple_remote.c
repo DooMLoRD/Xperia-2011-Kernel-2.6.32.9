@@ -642,10 +642,12 @@ static void simple_remote_plug_det_work(struct work_struct *work)
 		} else {
 			jack->num_omtp_detections++;
 		}
-		jack->num_headphone_detections = 0;
-	} else {
-		jack->num_headphone_detections++;
 	}
+
+	if (jack->new_accessory_state == DEVICE_HEADPHONE)
+		jack->num_headphone_detections++;
+	else
+		jack->num_headphone_detections = 0;
 
 	/*
 	 * Avoid the conflict between audio path changing and alternate

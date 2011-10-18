@@ -15,6 +15,7 @@ obj-$(CONFIG_SN12M0PZ) += sn12m0pz.o sn12m0pz_reg.o
 obj-$(CONFIG_MT9P012) += mt9p012_reg.o
 obj-$(CONFIG_SEIX006) += seix006.o seix006_cam_devdrv_table.o
 obj-$(CONFIG_OVM7692) += ovm7692.o ovm7692_reg.o
+obj-$(CONFIG_MT9V114) += mt9v114.o mt9v114_reg.o
 obj-$(CONFIG_MSM_CAMERA_AF_FOXCONN) += mt9p012_fox.o
 obj-$(CONFIG_MSM_CAMERA_AF_BAM) += mt9p012_bam.o
 obj-$(CONFIG_MT9P012_KM) += mt9p012_km.o mt9p012_km_reg.o

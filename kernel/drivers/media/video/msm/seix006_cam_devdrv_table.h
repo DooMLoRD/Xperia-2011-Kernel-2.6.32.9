@@ -57,6 +57,8 @@ extern const struct reg_entry seix006_vendor_1_SHD_2_ES2[];
 extern int32_t sizeof_seix006_vendor_1_SHD_2_ES2;
 extern const struct reg_entry seix006_vendor_1_SHD_3_ES2[];
 extern int32_t sizeof_seix006_vendor_1_SHD_3_ES2;
+extern const struct reg_entry seix006_vf_resolution_1280x720[];
+extern int32_t sizeof_seix006_vf_resolution_1280x720;
 extern const struct reg_entry seix006_vf_resolution_800x480[];
 extern int32_t sizeof_seix006_vf_resolution_800x480;
 extern const struct reg_entry seix006_vf_resolution_640x480[];

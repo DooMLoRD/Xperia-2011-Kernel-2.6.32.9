@@ -43,12 +43,20 @@
 #include <mach/qdsp5v2/marimba_profile_urushi.h>
 #elif defined(CONFIG_MACH_SEMC_SMULTRON)
 #include <mach/qdsp5v2/marimba_profile_smultron.h>
+#elif defined(CONFIG_MACH_SEMC_SATSUMA)
+#include <mach/qdsp5v2/marimba_profile_satsuma.h>
 #elif defined(CONFIG_MACH_SEMC_MANGO)
 #include <mach/qdsp5v2/marimba_profile_mango.h>
 #elif defined(CONFIG_MACH_SEMC_AKANE)
 #include <mach/qdsp5v2/marimba_profile_akane.h>
 #elif defined(CONFIG_MACH_SEMC_AZUSA)
 #include <mach/qdsp5v2/marimba_profile_azusa.h>
+#elif defined(CONFIG_MACH_SEMC_AYAME)
+#include <mach/qdsp5v2/marimba_profile_ayame.h>
+#elif defined(CONFIG_MACH_SEMC_HAIDA)
+#include <mach/qdsp5v2/marimba_profile_hallon.h>
+#else
+#include <mach/qdsp5v2/marimba_profile_mogami.h>
 #endif
 
 /***************************************************************************\

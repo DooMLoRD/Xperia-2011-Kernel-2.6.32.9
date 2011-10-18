@@ -586,6 +586,30 @@ static int msm_device_volume_put(struct snd_kcontrol *kcontrol,
 	return rc;
 }
 
+static int msm_reset_info(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0;
+	return 0;
+}
+
+static int msm_reset_get(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = 0;
+	return 0;
+}
+
+static int msm_reset_put(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	MM_DBG("Resetting all devices\n");
+	return msm_reset_all_device();
+}
+
 static int msm_device_mute_info(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_info *uinfo)
 {
@@ -630,6 +654,9 @@ static int msm_device_mute_put(struct snd_kcontrol *kcontrol,
 		afe_dev_id = AFE_HW_PATH_MI2S_TX;
 	if (mute)
 		volume = 0;
+	else
+		volume = dev_info->dev_volume;
+
 	afe_device_volume_ctrl(afe_dev_id, volume);
 	return 0;
 }
@@ -688,7 +715,9 @@ static struct snd_kcontrol_new snd_msm_controls[] = {
 						msm_v_call_put, 0),
 	MSM_EXT("Device_Volume", 9, msm_device_volume_info,
 			msm_device_volume_get, msm_device_volume_put, 0),
-	MSM_EXT("Device_Mute", 10, msm_device_mute_info,
+	MSM_EXT("Reset", 10, msm_reset_info,
+			msm_reset_get, msm_reset_put, 0),
+	MSM_EXT("Device_Mute", 11, msm_device_mute_info,
 			msm_device_mute_get, msm_device_mute_put, 0),
 };
 
@@ -752,7 +781,6 @@ static struct snd_soc_device msm_audio_snd_devdata = {
 	.card = &snd_soc_card_msm,
 	.codec_dev = &soc_codec_dev_msm,
 };
-
 
 static int __init msm_audio_init(void)
 {
