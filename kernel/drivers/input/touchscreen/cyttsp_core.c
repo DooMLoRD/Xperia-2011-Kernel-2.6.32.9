@@ -1379,7 +1379,6 @@ success:
 	atomic_set(&ts->mode, MODE_SYSINFO);
 	dev_info(ts->pdev, "%s: mode entered.\n", __func__);
 	msleep(CYTTSP_SCAN_PERIOD);
-	cyttsp_handshake(ts);
 	rc = ttsp_read_block_data(ts, CY_REG_BASE,
 				sizeof(ts->sysinfo_data), &(ts->sysinfo_data));
 	dev_info(ts->pdev, "%s: SI2:tts_ver=0x%02X%02X app_id=0x%02X%02X "
@@ -1738,7 +1737,7 @@ static void cyttsp_ts_early_suspend(struct early_suspend *h)
 	LOCK(ts->mutex);
 	ts->suspended = 1;
 	if (!ts->fw_loader_mode) {
-		disable_irq(ts->irq);
+		disable_irq_nosync(ts->irq);
 		dev_dbg(ts->pdev, "%s: stop ESD check\n", __func__);
 		cancel_delayed_work_sync(&ts->work);
 		cyttsp_suspend(ts);

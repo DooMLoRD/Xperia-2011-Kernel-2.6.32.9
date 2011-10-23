@@ -1,7 +1,7 @@
 /*
  * Automatically generated C config: don't edit
  * Linux kernel version: 2.6.32.9
- * Wed Oct 19 02:30:14 2011
+ * Mon Oct 24 03:16:46 2011
  */
 #define AUTOCONF_INCLUDED
 #define CONFIG_MDDI_NOVATEK_PANEL_SHARP_LS042T3LX 1

@@ -1223,13 +1223,15 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 				return -ERANGE;
 			}
 		}
-	}
 
-	if (req->src_rect.w > (req->dst_rect.w * 4)) {
-		if (req->src_rect.w % req->dst_rect.w) { /* need integer */
-			mdp4_stat.err_scale++;
-			printk(KERN_ERR "mpd_overlay_req2pipe: need integer (w)!\n");
-			return -ERANGE;
+		if (req->src_rect.w > (req->dst_rect.w * 4)) {
+			/* need integer */
+			if (req->src_rect.w % req->dst_rect.w) {
+				mdp4_stat.err_scale++;
+				printk(KERN_ERR "mpd_overlay_req2pipe: \
+						need integer (w)!\n");
+				return -ERANGE;
+			}
 		}
 	}
 
