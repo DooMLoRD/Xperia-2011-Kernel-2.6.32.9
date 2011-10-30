@@ -1,4 +1,4 @@
-Common repo for SE Xperia 2011 Devices
+Common repo for supported SE Xperia 2011 Devices
 
 
 kernel configs:
@@ -15,28 +15,4 @@ Codename : anzu
 Device   : Xperia Play
 Model No.: R800
 Codename : zeus
-
-
-no longer supported:
-
-[doom_neo_defconfig]
-Device   : Xperia Neo
-Model No.: MT15
-Codename : hallon
-
-[doom_minipro_defconfig]
-Device   : Xperia Mini Pro
-Model No.: SK17
-Codename : mango
-
-[doom_mini_defconfig]
-Device   : Xperia Mini
-Model No.: ST15
-Codename : smultron
-
-[doom_ray_defconfig]
-Device   : Xperia Ray
-Model No.: ST18
-Codename : urushi
-
 
