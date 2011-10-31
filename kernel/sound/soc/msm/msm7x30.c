@@ -1,4 +1,5 @@
 /* Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2010, 2011 Sony Ericsson Mobile Communications AB
  *
  * All source code in this file is licensed under the following license except
  * where indicated.
@@ -14,6 +15,9 @@
  * See the GNU General Public License for more details.
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, you can find it at http://www.fsf.org.
+ *
+ * NOTE: This file has been modified by Sony Ericsson Mobile Communications AB.
+ * Modifications are licensed under the License.
  */
 
 #include <linux/init.h>
@@ -33,6 +37,7 @@
 #include <asm/dma.h>
 #include <linux/dma-mapping.h>
 #include <linux/msm_audio.h>
+#include <linux/pm_qos_params.h>
 
 #include "msm7kv2-pcm.h"
 #include <asm/mach-types.h>
@@ -51,6 +56,11 @@ char snddev_name[AUDIO_DEV_CTL_MAX_DEV][44];
 #define MSM_MAX_VOLUME 0x2000
 #define MSM_VOLUME_STEP ((MSM_MAX_VOLUME+17)/100) /* 17 added to avoid
 						      more deviation */
+
+#define STEREO_RECORDING_SNDDEV "speaker_dual_mic_endfire_tx_real_stereo"
+#define MODULE_NAME "msm_audio"
+#define PM_QOS_NO_ISAPC 10
+
 static int device_index; /* Count of Device controls */
 static int simple_control; /* Count of simple controls*/
 
@@ -329,6 +339,16 @@ static int msm_device_put(struct snd_kcontrol *kcontrol,
 
 	if (set) {
 		if (!dev_info->opened) {
+#if defined(CONFIG_MACH_SEMC_MANGO)
+			if (strcmp(dev_info->name,
+				STEREO_RECORDING_SNDDEV) == 0) {
+				MM_INFO("insert cpu_dma_latency"
+						"for stereo recording\n");
+				pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY,
+							MODULE_NAME,
+							PM_QOS_NO_ISAPC);
+			}
+#endif
 			set_freq = dev_info->sample_rate;
 			if (!msm_device_is_voice(route_cfg.dev_id)) {
 				msm_get_voc_freq(&tx_freq, &rx_freq);
@@ -363,6 +383,16 @@ static int msm_device_put(struct snd_kcontrol *kcontrol,
 		}
 	} else {
 		if (dev_info->opened) {
+#if defined(CONFIG_MACH_SEMC_MANGO)
+			if (strcmp(dev_info->name,
+				STEREO_RECORDING_SNDDEV) == 0) {
+				MM_INFO("remove cpu_dma_latency"
+						"for stereo recording\n");
+				pm_qos_remove_requirement(
+						PM_QOS_CPU_DMA_LATENCY,
+						MODULE_NAME);
+			}
+#endif
 			broadcast_event(AUDDEV_EVT_REL_PENDING,
 						route_cfg.dev_id,
 						SESSION_IGNORE);
