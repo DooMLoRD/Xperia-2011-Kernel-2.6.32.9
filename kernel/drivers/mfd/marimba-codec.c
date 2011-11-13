@@ -258,11 +258,12 @@ static int adie_codec_write(u8 reg, u8 mask, u8 val)
 
 	return 0;
 }
-
+#ifdef CONFIG_DEBUG_FS
 static int adie_codec_read(u8 reg, u8 *val)
 {
 	return marimba_read(adie_codec.pdrv_ptr, reg, val, 1);
 }
+#endif
 
 static int adie_codec_read_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
 				   u32 *cur_index)
