@@ -4,8 +4,6 @@ Common repo for supported SE Xperia 2011 Devices
 kernel configs:
 ---------------
 
-new 4.0.2.A.0.9 defconfigs updated for:
-
 [doom_arc_defconfig]
 Device   : Xperia Arc
 Model No.: LT15
