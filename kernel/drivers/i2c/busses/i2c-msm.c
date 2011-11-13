@@ -382,7 +382,7 @@ msm_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	mutex_lock(&dev->mlock);
 	if (dev->suspended) {
 		mutex_unlock(&dev->mlock);
-		wake_unlock(&dev->wakelock);
+		//wake_unlock(&dev->wakelock); //TESTING FIX
 		return -EIO;
 	}
 
