@@ -1583,7 +1583,6 @@ struct audio_client *q6audio_open_pcm(uint32_t bufsz, uint32_t rate,
 
 	mutex_lock(&audio_path_lock);
 
-#if 0
 	if (ac->flags & AUDIO_FLAG_WRITE) {
 		audio_rx_path_refcount++;
 		if (audio_rx_path_refcount == 1) {
@@ -1620,47 +1619,6 @@ struct audio_client *q6audio_open_pcm(uint32_t bufsz, uint32_t rate,
 		if (audio_rx_path_refcount == 1)
 			audio_rx_analog_enable(1);
 	}
-#else
-        if (ac->flags & AUDIO_FLAG_WRITE) {
-                audio_rx_path_refcount++;
-                if (audio_rx_path_refcount == 1) {
-                        _audio_rx_clk_enable();
-                        q6_rx_path_enable(0, acdb_id);
-                        adie_rx_path_enable(acdb_id);
-                }
-        } else {
-                /* TODO: consider concurrency with voice call */
-                if (audio_tx_path_refcount > 0) {
-                        tx_clk_freq = 8000;
-                } else {
-                        tx_clk_freq = rate;
-                }
-                audio_tx_path_refcount++;
-                if (audio_tx_path_refcount == 1) {
-                        tx_clk_freq = rate;
-                        _audio_tx_clk_enable();
-                        _audio_tx_path_enable(0, acdb_id);
-                }
-        }
-
-        for (retry = 5;;retry--) {
-                if (ac->flags & AUDIO_FLAG_WRITE)
-                        rc = audio_out_open(ac, bufsz, rate, channels);
-                else
-                        rc = audio_in_open(ac, bufsz, flags, rate, channels);
-                if (rc == 0)
-                        break;
-                if (retry == 0)
-                        BUG();
-                pr_err("q6audio: open pcm error %d, retrying\n", rc);
-                msleep(1);
-        }
-
-        if (ac->flags & AUDIO_FLAG_WRITE) {
-                if (audio_rx_path_refcount == 1)
-                        audio_rx_analog_enable(1);
-        }
-#endif
 	mutex_unlock(&audio_path_lock);
 
 	for (retry = 5;;retry--) {

@@ -21,20 +21,11 @@
 #include <linux/sched.h>
 #include <linux/wait.h>
 #include <linux/uaccess.h>
-#include <linux/slab.h>
 
 #include <linux/msm_audio.h>
 
 #include <mach/msm_qdsp6_audio.h>
 #include <mach/debug_mm.h>
-
-struct msm_voicerec_mode {
-        uint32_t rec_mode;
-};
-
-
-#define AUDIO_SET_INCALL _IOW(AUDIO_IOCTL_MAGIC, 19, struct msm_voicerec_mode)
-#define AUDIO_FLAG_INCALL_MIXED 2
 
 struct pcm {
 	struct audio_client *ac;
