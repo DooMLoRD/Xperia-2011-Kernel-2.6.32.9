@@ -6,3 +6,5 @@ rm Makefile
 cp Makefile.gcc462 Makefile
 rm drivers/net/wireless/bcm4329/Makefile
 cp drivers/net/wireless/bcm4329/Makefile.gcc462 drivers/net/wireless/bcm4329/Makefile
+rm scripts/mkcompile_h
+cp scripts/mkcompile_h.gcc462 scripts/mkcompile_h
