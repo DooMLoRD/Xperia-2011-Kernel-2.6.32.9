@@ -39,7 +39,7 @@
 #include "smd_rpcrouter.h"
 
 enum buf_state_type {
-	FREE = 0,
+	FREEFIX = 0,
 	FULL,
 	DATA_READY,
 };
@@ -170,7 +170,7 @@ static int sdio_buf_read(void *data, uint32_t len)
 			active_buf->read_start_index = 0;
 			active_buf->read_end_index = 0;
 			active_buf->size = 0;
-			active_buf->state = FREE;
+			active_buf->state = FREEFIX;
 		} else
 			active_buf->state = DATA_READY;
 	}
@@ -434,7 +434,7 @@ static int allocate_sdio_xprt(struct sdio_xprt **sdio_xprt_chnl)
 	spin_lock_init(&chnl->lock);
 
 	for (i = 0; i < NO_OF_SDIO_IN_BUF; i++) {
-		chnl->buffer[i].state = FREE;
+		chnl->buffer[i].state = FREEFIX;
 		chnl->buffer[i].size = 0;
 		chnl->buffer[i].read_avail = 0;
 		chnl->buffer[i].read_start_index = 0;
