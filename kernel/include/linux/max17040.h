@@ -24,9 +24,6 @@ struct max17040_rcomp_data {
 struct max17040_platform_data {
 	struct max17040_model_desc model_desc;
 	struct max17040_rcomp_data rcomp_data;
-
-	int chg_max_temp;
-	int chg_min_temp;
 };
 
 #endif

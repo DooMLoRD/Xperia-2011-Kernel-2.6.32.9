@@ -133,9 +133,6 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 	uint32 mddi_ld_param;
 	uint16 mddi_vdo_packet_reg;
 	struct mdp4_overlay_pipe *pipe;
-#ifdef CONFIG_FB_MSM_MDDI_LCD_WINDOW_ADJUST
-	struct msm_fb_panel_data *pdata = mfd->pdev->dev.platform_data;
-#endif
 	int ret;
 
 	if (mfd->key != MFD_KEY)
@@ -179,19 +176,6 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 
 		mddi_ld_param = 0;
 		mddi_vdo_packet_reg = mfd->panel_info.mddi.vdopkt;
-
-		if (mdp_hw_revision == MDP4_REVISION_V2_1) {
-			uint32 data;
-
-			data = inpdw(MDP_BASE + 0x0028);
-			data &= ~0x0300;	/* bit 8, 9, MASTER4 */
-			if (mfd->fbi->var.xres == 540) /* qHD, 540x960 */
-				data |= 0x0200;
-			else
-				data |= 0x0100;
-
-			MDP_OUTP(MDP_BASE + 0x00028, data);
-		}
 
 		if (mfd->panel_info.type == MDDI_PANEL) {
 			if (mfd->panel_info.pdest == DISPLAY_1)
@@ -280,13 +264,6 @@ void mdp4_overlay_update_lcd(struct msm_fb_data_type *mfd)
 		pipe->srcp0_addr = (uint32) src;
 		pipe->srcp0_ystride = iBuf->ibuf_width * iBuf->bpp;
 	}
-#endif
-
-	/* set window display range before every frame transfer */
-#ifdef CONFIG_FB_MSM_MDDI_LCD_WINDOW_ADJUST
-	if ((pdata != NULL) && pdata->window_adjust)
-		pdata->window_adjust(pipe->src_x, pipe->src_width-1,
-					pipe->src_y, pipe->src_height-1);
 #endif
 
 	pipe->mixer_stage  = MDP4_MIXER_STAGE_BASE;
@@ -402,7 +379,6 @@ void mdp4_dma_p_done_mddi(void)
 void mdp4_overlay0_done_mddi()
 
 {
-
 	mdp_disable_irq_nosync(MDP_OVERLAY0_TERM);
 
 	if (pending_pipe)
@@ -444,7 +420,6 @@ void mdp4_mddi_dma_busy_wait(struct msm_fb_data_type *mfd,
 	if (pipe == NULL) /* first time since boot up */
 		return;
 
-	down(&mfd->dma->pending_pipe_sem);
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 	if (mfd->dma->busy == TRUE) {
 		INIT_COMPLETION(pipe->comp);
@@ -458,7 +433,6 @@ void mdp4_mddi_dma_busy_wait(struct msm_fb_data_type *mfd,
 		mfd->dma_update_flag = 0;
 		pending_pipe = NULL;
 	}
-	up(&mfd->dma->pending_pipe_sem);
 }
 
 void mdp4_mddi_kickoff_video(struct msm_fb_data_type *mfd,
@@ -484,11 +458,11 @@ void mdp4_mddi_kickoff_ui(struct msm_fb_data_type *mfd,
 {
 
 	if (mdp4_overlay_mixer_play(mddi_pipe->mixer_num) > 0) {
-		INIT_COMPLETION(mddi_delay_comp);
-		atomic_set(&mddi_delay_kickoff_cnt, 1);
 #ifdef MDDI_TIMER
 		mddi_add_delay_timer(10);
 #endif
+		atomic_set(&mddi_delay_kickoff_cnt, 1);
+		INIT_COMPLETION(mddi_delay_comp);
 		up(&mfd->dma->ov_sem);
 		wait_for_completion_killable(&mddi_delay_comp);
 		down(&mfd->dma->ov_sem);
@@ -503,25 +477,23 @@ void mdp4_mddi_kickoff_ui(struct msm_fb_data_type *mfd,
 void mdp4_mddi_overlay_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe)
 {
-	struct msm_fb_panel_data *pdata = mfd->pdev->dev.platform_data;
-
-	if (pdata && pdata->power_on_panel_at_pan) {
-		down(&mfd->dma->pending_pipe_sem);
-		INIT_COMPLETION(pipe->comp);
-		pending_pipe = pipe;
-	}
+	struct msm_fb_panel_data *pdata =
+		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 
 	down(&mfd->sem);
 	mdp_enable_irq(MDP_OVERLAY0_TERM);
 	mfd->dma->busy = TRUE;
+	if (pdata->power_on_panel_at_pan) {
+		INIT_COMPLETION(pipe->comp);
+		pending_pipe = pipe;
+	}
 	/* start OVERLAY pipe */
 	mdp_pipe_kickoff(MDP_OVERLAY0_TERM, mfd);
 	up(&mfd->sem);
 
-	if (pdata && pdata->power_on_panel_at_pan) {
+	if (pdata->power_on_panel_at_pan) {
 		wait_for_completion_killable(&pipe->comp);
 		pending_pipe = NULL;
-		up(&mfd->dma->pending_pipe_sem);
 	}
 }
 
@@ -603,26 +575,24 @@ void mdp4_dma_s_update_lcd(struct msm_fb_data_type *mfd,
 void mdp4_mddi_dma_s_kickoff(struct msm_fb_data_type *mfd,
 				struct mdp4_overlay_pipe *pipe)
 {
-	struct msm_fb_panel_data *pdata = mfd->pdev->dev.platform_data;
-
-	if (pdata && pdata->power_on_panel_at_pan) {
-		down(&mfd->dma->pending_pipe_sem);
-		INIT_COMPLETION(pipe->comp);
-		pending_pipe = pipe;
-	}
+	struct msm_fb_panel_data *pdata =
+		(struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 
 	down(&mfd->sem);
 	mdp_enable_irq(MDP_DMA_S_TERM);
 	mfd->dma->busy = TRUE;
 	mfd->ibuf_flushed = TRUE;
+	if (pdata->power_on_panel_at_pan) {
+		INIT_COMPLETION(pipe->comp);
+		pending_pipe = pipe;
+	}
 	/* start dma_s pipe */
 	mdp_pipe_kickoff(MDP_DMA_S_TERM, mfd);
 	up(&mfd->sem);
 
-	if (pdata && pdata->power_on_panel_at_pan) {
+	if (pdata->power_on_panel_at_pan) {
 		wait_for_completion_killable(&pipe->comp);
 		pending_pipe = NULL;
-		up(&mfd->dma->pending_pipe_sem);
 	}
 }
 
@@ -664,7 +634,6 @@ void mdp4_mddi_overlay(struct msm_fb_data_type *mfd)
 			complete(&mfd->pan_comp);
 		}
 	}
-	mdp4_overlay_resource_release();
+
 	up(&mfd->dma->ov_sem);
 }
-

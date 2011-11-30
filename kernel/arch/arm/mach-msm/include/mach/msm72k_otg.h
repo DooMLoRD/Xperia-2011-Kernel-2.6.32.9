@@ -169,7 +169,6 @@ struct msm_otg {
 	struct timer_list	id_timer;	/* drives id_status polling */
 	unsigned		b_max_power;	/* ACA: max power of accessory*/
 	u8			aca_connection;	/* ACA: connection status */
-	int			wait_id_stable_duration;
 #endif
 };
 

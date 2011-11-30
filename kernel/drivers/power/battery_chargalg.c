@@ -29,7 +29,7 @@
 #define STOP_SAFETY_TIMER_CURRENT_MA 40
 #define OVP_CHECK_TIME_S 1
 #define OVP_CHECK_DURATION_S 60
-#define EXCEEDED_TEMP_COUNTER_MAX 3
+#define OVERHEAT_COUNTER_MAX 3
 #define CURRENT_CONTROL_CHECK_TIME_S 1
 #define ALGORITHM_UPDATE_TIME_S 10
 
@@ -65,7 +65,6 @@ enum battery_chargalg_state {
 	BATT_ALG_STATE_WARM,
 	BATT_ALG_STATE_OVERHEAT,
 	BATT_ALG_STATE_FULL,
-	BATT_ALG_STATE_FAULT_COLD,
 	BATT_ALG_STATE_FAULT_OVERHEAT,
 	BATT_ALG_STATE_FAULT_SAFETY_TIMER,
 	BATT_ALG_STATE_FAULT_OVERVOLTAGE,
@@ -114,12 +113,11 @@ struct battery_chargalg_driver {
 	struct work_struct ext_pwr_changed_work;
 	struct delayed_work work;
 	struct mutex lock;
-	struct mutex disable_lock;
 	struct power_supply *ps_batt_volt;
 	struct power_supply *ps_batt_curr;
 	struct power_supply *ps_eoc;
 
-	struct battery_chargalg_platform_data *pdata;
+	struct battery_chargalg_platform_data *control;
 	struct safety_timer_data safety_timer;
 	struct check_data eoc;
 	struct check_data ovp;
@@ -129,12 +127,9 @@ struct battery_chargalg_driver {
 	u8 ext_dependency_timeout_cnt;
 	u8 disable_algorithm;
 	u8 chg_connected;
-	u8 exceed_temp_counter;
-	bool exceed_temp_counter_inactive;
+	u8 overheat_counter;
+	u8 overheat_counter_inactive;
 	u8 current_control_counter;
-#ifdef CONFIG_BATTERY_CHARGALG_ENABLE_STEP_CHARGING
-	u8 step_charging_idx;
-#endif
 	u16 chg_curr;
 	s32 enable_ambient_temp;
 
@@ -250,20 +245,20 @@ static void update_warm_sub_state(struct battery_chargalg_driver *alg)
 	switch (alg->warm_sub_state) {
 	case BATT_ALG_SUB_STATE_WARM_1:
 		if (alg->batt_curr <
-			 alg->pdata->average_current_min_limit)
+			 alg->control->average_current_min_limit)
 			alg->warm_sub_state = BATT_ALG_SUB_STATE_WARM_2;
 		break;
 	case BATT_ALG_SUB_STATE_WARM_2:
 		if (alg->batt_curr <
-			 alg->pdata->average_current_min_limit)
+			 alg->control->average_current_min_limit)
 			alg->warm_sub_state = BATT_ALG_SUB_STATE_WARM_3;
 		else if (alg->batt_curr >
-			 alg->pdata->average_current_max_limit)
+			 alg->control->average_current_max_limit)
 			alg->warm_sub_state = BATT_ALG_SUB_STATE_WARM_1;
 		break;
 	case BATT_ALG_SUB_STATE_WARM_3:
 		if (alg->batt_curr >
-			 alg->pdata->average_current_max_limit)
+			 alg->control->average_current_max_limit)
 			alg->warm_sub_state = BATT_ALG_SUB_STATE_WARM_2;
 		break;
 	default:
@@ -277,13 +272,13 @@ static u16 update_charge_current(struct battery_chargalg_driver *alg)
 
 	switch (alg->warm_sub_state) {
 	case BATT_ALG_SUB_STATE_WARM_1:
-		chg_current = alg->pdata->charge_set_current_1;
+		chg_current = alg->control->charge_set_current_1;
 		break;
 	case BATT_ALG_SUB_STATE_WARM_2:
-		chg_current = alg->pdata->charge_set_current_2;
+		chg_current = alg->control->charge_set_current_2;
 		break;
 	case BATT_ALG_SUB_STATE_WARM_3:
-		chg_current = alg->pdata->charge_set_current_3;
+		chg_current = alg->control->charge_set_current_3;
 		break;
 	default:
 		break;
@@ -310,10 +305,10 @@ static ssize_t store_disable_charging(struct device *pdev,
 		struct battery_chargalg_driver *alg =
 			container_of(psy, struct battery_chargalg_driver, ps);
 
-		MUTEX_LOCK(&alg->disable_lock);
+		MUTEX_LOCK(&alg->lock);
 		if (disable != alg->disable_algorithm)
 			alg->disable_algorithm = disable;
-		MUTEX_UNLOCK(&alg->disable_lock);
+		MUTEX_UNLOCK(&alg->lock);
 
 		battery_chargalg_schedule_delayed_work(&alg->work, 0);
 	} else {
@@ -344,8 +339,8 @@ static ssize_t store_disable_usbhost(struct device *pdev,
 			container_of(psy, struct battery_chargalg_driver, ps);
 
 		MUTEX_LOCK(&alg->lock);
-		if (disable != alg->pdata->disable_usb_host_charging)
-			alg->pdata->disable_usb_host_charging = disable;
+		if (disable != alg->control->disable_usb_host_charging)
+			alg->control->disable_usb_host_charging = disable;
 		MUTEX_UNLOCK(&alg->lock);
 
 		battery_chargalg_schedule_delayed_work(&alg->work, 0);
@@ -511,7 +506,7 @@ static int battery_chargalg_get_ext_data(struct device *dev, void *data)
 			dev_dbg(alg->dev, "New batt cap %d\n", alg->batt_cap);
 		}
 
-		if (batt && alg->pdata->ext_eoc_recharge_enable &&
+		if (batt && alg->control->ext_eoc_recharge_enable &&
 		    !GET_PSY_PROP(ext, CAPACITY_LEVEL, &ret) &&
 		    ret.intval != alg->batt_cap_level) {
 			update++;
@@ -583,8 +578,8 @@ static void battery_chargalg_ext_pwr_changed_worker(struct work_struct *work)
 
 	if (alg->chg_connected) {
 		u16 curr = 0;
-		if (alg->pdata->get_supply_current_limit)
-			curr = (u16)alg->pdata->get_supply_current_limit();
+		if (alg->control->get_supply_current_limit)
+			curr = (u16)alg->control->get_supply_current_limit();
 		if (curr != alg->chg_curr) {
 			updated++;
 			alg->chg_curr = curr;
@@ -617,16 +612,16 @@ static int battery_chargalg_check_ext_psy_available(
 {
 	int missing = 0;
 
-	if (alg->pdata->batt_volt_psy_name && !alg->ps_batt_volt) {
+	if (alg->control->batt_volt_psy_name && !alg->ps_batt_volt) {
 		alg->ps_batt_volt =
-		power_supply_get_by_name(alg->pdata->batt_volt_psy_name);
+		power_supply_get_by_name(alg->control->batt_volt_psy_name);
 		if (!alg->ps_batt_volt)
 			missing++;
 	}
 
-	if (alg->pdata->batt_curr_psy_name && !alg->ps_batt_curr) {
+	if (alg->control->batt_curr_psy_name && !alg->ps_batt_curr) {
 		alg->ps_batt_curr =
-		power_supply_get_by_name(alg->pdata->batt_curr_psy_name);
+		power_supply_get_by_name(alg->control->batt_curr_psy_name);
 		if (!alg->ps_batt_curr)
 			missing++;
 	}
@@ -652,16 +647,14 @@ static void battery_chargalg_update_battery_data(
 		if (!GET_PSY_PROP(alg->ps_batt_volt, VOLTAGE_AVG, &val))
 			alg->batt_volt = val.intval / 1000;
 		else if (!GET_PSY_PROP(alg->ps_batt_volt, VOLTAGE_NOW, &val))
-			alg->batt_volt =
-				(alg->batt_volt + val.intval / 1000) / 2;
+			alg->batt_volt = val.intval / 1000;
 	}
 
 	if (alg->ps_batt_curr) {
 		if (!GET_PSY_PROP(alg->ps_batt_curr, CURRENT_AVG, &val))
 			alg->batt_curr = val.intval / 1000;
 		else if (!GET_PSY_PROP(alg->ps_batt_curr, CURRENT_NOW, &val))
-			alg->batt_curr =
-				(alg->batt_curr + val.intval / 1000) / 2;
+			alg->batt_curr = val.intval / 1000;
 	}
 
 	MUTEX_UNLOCK(&alg->lock);
@@ -684,14 +677,14 @@ static void battery_chargalg_eoc_worker(struct work_struct *work)
 		eoc->hits + 1);
 
 	if ((alg->batt_volt + 50) < alg->ctrl.volt ||
-	    alg->batt_curr > alg->pdata->eoc_current_term) {
+	    alg->batt_curr > alg->control->eoc_current_term) {
 		eoc->hits = 0;
 		eoc->check_active = 0;
 		MUTEX_UNLOCK(&alg->lock);
 		return;
 	}
 
-	if (++eoc->hits == alg->pdata->eoc_current_flat_time) {
+	if (++eoc->hits == alg->control->eoc_current_flat_time) {
 		eoc->hits = 0;
 		eoc->check_active = 0;
 		eoc->active = 1;
@@ -707,7 +700,7 @@ static void battery_chargalg_check_eoc(struct battery_chargalg_driver *alg)
 {
 	MUTEX_LOCK(&alg->lock);
 
-	if (alg->pdata->ext_eoc_recharge_enable) {
+	if (alg->control->ext_eoc_recharge_enable) {
 		if (POWER_SUPPLY_CAPACITY_LEVEL_FULL == alg->batt_cap_level &&
 		    !alg->eoc.active) {
 			alg->eoc.active = 1;
@@ -718,7 +711,7 @@ static void battery_chargalg_check_eoc(struct battery_chargalg_driver *alg)
 		if (!alg->ctrl.volt || !alg->ctrl.curr ||
 		    alg->eoc.active || alg->eoc.check_active ||
 		    (alg->batt_volt + 50) < alg->ctrl.volt ||
-		    alg->batt_curr > alg->pdata->eoc_current_term)
+		    alg->batt_curr > alg->control->eoc_current_term)
 			goto check_eoc_exit;
 
 		alg->eoc.check_active = 1;
@@ -742,9 +735,9 @@ static void battery_chargalg_ovp_worker(struct work_struct *work)
 	MUTEX_LOCK(&alg->lock);
 
 	dev_dbg(alg->dev, "OVP worker: vbatt %u mV, max %u mV\n",
-		alg->batt_volt, alg->pdata->overvoltage_max_design);
+		alg->batt_volt, alg->control->overvoltage_max_design);
 
-	if (alg->batt_volt < alg->pdata->overvoltage_max_design) {
+	if (alg->batt_volt < alg->control->overvoltage_max_design) {
 		ovp->hits = 0;
 		ovp->check_active = 0;
 		MUTEX_UNLOCK(&alg->lock);
@@ -770,7 +763,7 @@ static void battery_chargalg_check_ovp(struct battery_chargalg_driver *alg)
 	MUTEX_LOCK(&alg->lock);
 
 	if (alg->ovp.active || alg->ovp.check_active ||
-	    alg->batt_volt < alg->pdata->overvoltage_max_design) {
+	    alg->batt_volt < alg->control->overvoltage_max_design) {
 		MUTEX_UNLOCK(&alg->lock);
 		return;
 	}
@@ -904,46 +897,42 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 	MUTEX_LOCK(&alg->lock);
 
 	if (POWER_SUPPLY_TECHNOLOGY_UNKNOWN == alg->batt_tech) {
-		if (alg->pdata->unid_bat_reg) {
-			tlim = alg->pdata->unid_bat_reg->temp;
-			vlim = alg->pdata->unid_bat_reg->volt;
+		if (alg->control->unid_bat_reg) {
+			tlim = alg->control->unid_bat_reg->temp;
+			vlim = alg->control->unid_bat_reg->volt;
 		}
-	} else if (alg->pdata->id_bat_reg) {
-		tlim = alg->pdata->id_bat_reg->temp;
-		vlim = alg->pdata->id_bat_reg->volt;
+	} else if (alg->control->id_bat_reg) {
+		tlim = alg->control->id_bat_reg->temp;
+		vlim = alg->control->id_bat_reg->volt;
 	}
 
 	dev_dbg(alg->dev, "Enter state: %u, chg: %u, disable: %u, disable usb: "
-		"%u, eoc: %u, ovp: %u, timer: %u, temp: %d, "
-		"exceed_temp_cnt: %u\n",
+		"%u, eoc: %u, ovp: %u, timer: %u, temp: %d\n",
 		alg->state, alg->chg_connected, alg->disable_algorithm,
-		alg->pdata->disable_usb_host_charging, alg->eoc.active,
-		alg->ovp.active, alg->safety_timer.expired, alg->batt_temp,
-		alg->exceed_temp_counter);
+		alg->control->disable_usb_host_charging, alg->eoc.active,
+		alg->ovp.active, alg->safety_timer.expired, alg->batt_temp);
 
 	if (!alg->chg_connected || !tlim || !vlim || alg->disable_algorithm ||
 	    ((alg->chg_connected & USB_CHG) &&
-	     alg->pdata->disable_usb_host_charging)) {
+	     alg->control->disable_usb_host_charging)) {
 		next_state = BATT_ALG_STATE_START;
 
 		/* When safety timer expires the timer resets when disconnecting
-		 * and connecting charger again.
-		 * So the exceeded temperature counter.
+		 * and connecting charger again. So the overheat counter.
 		 */
 		alg->safety_timer.expired = 0;
-		alg->exceed_temp_counter = 0;
-		alg->exceed_temp_counter_inactive = false;
+		alg->overheat_counter = 0;
 
 		if (alg->eoc.active) {
 			alg->eoc.active = 0;
-			if (alg->pdata->set_charging_status)
-				(void)alg->pdata->set_charging_status(-1);
+			if (alg->control->set_charging_status)
+				(void)alg->control->set_charging_status(-1);
 		}
 	} else if (alg->eoc.active &&
 		   BATT_ALG_STATE_FULL != alg->state) {
 		next_state = BATT_ALG_STATE_FULL;
-		if (alg->pdata->set_charging_status)
-			(void)alg->pdata->set_charging_status(
+		if (alg->control->set_charging_status)
+			(void)alg->control->set_charging_status(
 				POWER_SUPPLY_STATUS_FULL);
 	} else if (alg->ovp.active &&
 		   BATT_ALG_STATE_FAULT_OVERVOLTAGE != alg->state) {
@@ -953,12 +942,10 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 		next_state = BATT_ALG_STATE_FAULT_SAFETY_TIMER;
 	}
 
-	/* Reset exceeded temperature counters when charge cycle restarts */
+	/* Reset overheat counter when charge cycle restarts */
 	if (POWER_SUPPLY_STATUS_FULL == alg->batt_status &&
-	    alg->exceed_temp_counter) {
-		alg->exceed_temp_counter = 0;
-		alg->exceed_temp_counter_inactive = false;
-	}
+	    alg->overheat_counter)
+		alg->overheat_counter = 0;
 
 	if (next_state != alg->state) {
 		alg->state = next_state;
@@ -971,7 +958,7 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 	case BATT_ALG_STATE_START:
 		if (!alg->chg_connected || !tlim || alg->disable_algorithm ||
 		    ((alg->chg_connected & USB_CHG) &&
-		     alg->pdata->disable_usb_host_charging))
+		     alg->control->disable_usb_host_charging))
 			break;
 
 		if (alg->ovp.active)
@@ -986,19 +973,9 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 			next_state = BATT_ALG_STATE_OVERHEAT;
 		break;
 	case BATT_ALG_STATE_COLD:
-		if (!alg->exceed_temp_counter_inactive) {
-			alg->exceed_temp_counter_inactive = true;
-			if (++alg->exceed_temp_counter >=
-			    EXCEEDED_TEMP_COUNTER_MAX)
-				next_state = BATT_ALG_STATE_FAULT_COLD;
-		}
-
-		if (next_state != BATT_ALG_STATE_FAULT_COLD &&
-		    alg->batt_temp > (tlim[BATTERY_CHARGALG_TEMP_COLD] +
-				      alg->pdata->temp_hysteresis_design)) {
+		if (alg->batt_temp > (tlim[BATTERY_CHARGALG_TEMP_COLD] +
+				       alg->control->temp_hysteresis_design))
 			next_state = BATT_ALG_STATE_NORMAL;
-			alg->exceed_temp_counter_inactive = false;
-		}
 		break;
 	case BATT_ALG_STATE_NORMAL:
 		if (alg->batt_temp < tlim[BATTERY_CHARGALG_TEMP_COLD])
@@ -1010,7 +987,7 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 		break;
 	case BATT_ALG_STATE_WARM:
 		if (alg->batt_temp < (tlim[BATTERY_CHARGALG_TEMP_NORMAL] -
-				      alg->pdata->temp_hysteresis_design))
+				      alg->control->temp_hysteresis_design))
 			next_state = BATT_ALG_STATE_NORMAL;
 		else if (alg->batt_temp < tlim[BATTERY_CHARGALG_TEMP_WARM])
 			next_state = BATT_ALG_STATE_WARM;
@@ -1018,29 +995,27 @@ static void battery_chargalg_state_machine(struct battery_chargalg_driver *alg)
 			next_state = BATT_ALG_STATE_OVERHEAT;
 		break;
 	case BATT_ALG_STATE_OVERHEAT:
-		if (!alg->exceed_temp_counter_inactive) {
-			alg->exceed_temp_counter_inactive = true;
-			if (++alg->exceed_temp_counter >=
-			    EXCEEDED_TEMP_COUNTER_MAX)
-				next_state = BATT_ALG_STATE_FAULT_OVERHEAT;
+		if (alg->batt_temp < (tlim[BATTERY_CHARGALG_TEMP_WARM] -
+				      alg->control->temp_hysteresis_design)) {
+			next_state = BATT_ALG_STATE_WARM;
+			alg->overheat_counter_inactive = 0;
 		}
 
-		if (next_state != BATT_ALG_STATE_FAULT_OVERHEAT &&
-		    alg->batt_temp < (tlim[BATTERY_CHARGALG_TEMP_WARM] -
-				      alg->pdata->temp_hysteresis_design)) {
-			next_state = BATT_ALG_STATE_WARM;
-			alg->exceed_temp_counter_inactive = false;
+		if (!alg->overheat_counter_inactive) {
+			alg->overheat_counter_inactive = 1;
+			if (++alg->overheat_counter >= OVERHEAT_COUNTER_MAX)
+				next_state = BATT_ALG_STATE_FAULT_OVERHEAT;
 		}
 		break;
 	case BATT_ALG_STATE_FULL:
-		if ((alg->pdata->ext_eoc_recharge_enable &&
+		if ((alg->control->ext_eoc_recharge_enable &&
 		     POWER_SUPPLY_CAPACITY_LEVEL_FULL != alg->batt_cap_level) ||
-		    (!alg->pdata->ext_eoc_recharge_enable && alg->batt_cap <=
-		     alg->pdata->recharge_threshold_capacity)) {
+		    (!alg->control->ext_eoc_recharge_enable && alg->batt_cap <=
+		     alg->control->recharge_threshold_capacity)) {
 			next_state = BATT_ALG_STATE_START;
 			alg->eoc.active = 0;
-			if (alg->pdata->set_charging_status)
-				(void)alg->pdata->set_charging_status(-1);
+			if (alg->control->set_charging_status)
+				(void)alg->control->set_charging_status(-1);
 		}
 		break;
 	default:
@@ -1072,7 +1047,6 @@ static void battery_chargalg_update_battery_health(
 	old_health = alg->batt_health;
 
 	switch (alg->state) {
-	case BATT_ALG_STATE_FAULT_COLD:
 	case BATT_ALG_STATE_COLD:
 		alg->batt_health = POWER_SUPPLY_HEALTH_COLD;
 		break;
@@ -1097,10 +1071,10 @@ static void battery_chargalg_update_battery_health(
 		s8 *tlim = NULL;
 
 		if (POWER_SUPPLY_TECHNOLOGY_UNKNOWN == alg->batt_tech) {
-			if (alg->pdata->unid_bat_reg)
-				tlim = alg->pdata->unid_bat_reg->temp;
-		} else if (alg->pdata->id_bat_reg) {
-			tlim = alg->pdata->id_bat_reg->temp;
+			if (alg->control->unid_bat_reg)
+				tlim = alg->control->unid_bat_reg->temp;
+		} else if (alg->control->id_bat_reg) {
+			tlim = alg->control->id_bat_reg->temp;
 		}
 
 		if (!tlim)
@@ -1127,7 +1101,7 @@ int get_warm_control_current(struct battery_chargalg_driver *alg, u16 *ilim)
 {
 	int curr;
 
-	if (alg->pdata->allow_dynamic_charge_current_ctrl) {
+	if (alg->control->allow_dynamic_charge_current_ctrl) {
 		update_warm_sub_state(alg);
 		curr = update_charge_current(alg);
 		alg->current_control_counter++;
@@ -1151,80 +1125,6 @@ static bool is_hyst_limit(struct battery_chargalg_driver *alg,
 	return false;
 }
 
-#ifdef CONFIG_BATTERY_CHARGALG_ENABLE_STEP_CHARGING
-static void battery_chargalg_control_step(struct battery_chargalg_driver *alg)
-{
-	struct step_charging *sc = alg->pdata->ddata->step_charging;
-	u16 vstep = alg->ctrl.volt;
-	u16 istep = alg->ctrl.curr;
-	u16 vup;
-	s16 iup;
-	u16 vdown;
-	u8 i;
-
-	if (BATT_ALG_STATE_START == alg->state)
-		alg->step_charging_idx = 0;
-
-	/* Is charging 'off'? */
-	if (!alg->ctrl.volt && !alg->ctrl.curr)
-		return;
-
-	dev_dbg(alg->dev, "[step chg in] Vbatt %u mV, Ibatt %d mA, Idx %u,"
-		" Vctrl %u mV, Ictrl %u mA\n",
-		alg->batt_volt, alg->batt_curr, alg->step_charging_idx,
-		alg->ctrl.volt, alg->ctrl.curr);
-
-	for (i = alg->step_charging_idx;
-	     i < alg->pdata->ddata->num_step_charging;
-	     i++) {
-		if (!i) {
-			vup = sc[i].volt - sc[i].volt_hysteresis_up;
-			iup = (alg->pdata->ddata->battery_capacity_mah *
-			       sc[i + 1].c_curr[BATTERY_CHARGALG_NUM]) /
-				sc[i + 1].c_curr[BATTERY_CHARGALG_DENOM];
-			vdown = 0;
-		} else if ((alg->pdata->ddata->num_step_charging - 1) == i) {
-			vup = USHORT_MAX;
-			iup = 0;
-			vdown = sc[i].volt - sc[i].volt_hysteresis_down;
-		} else {
-			vup = sc[i].volt - sc[i].volt_hysteresis_up;
-			iup = (alg->pdata->ddata->battery_capacity_mah *
-			       sc[i + 1].c_curr[BATTERY_CHARGALG_NUM]) /
-				sc[i + 1].c_curr[BATTERY_CHARGALG_DENOM];
-			vdown = sc[i].volt - sc[i].volt_hysteresis_down;
-		}
-
-		if (alg->batt_volt >= vup && alg->batt_curr <= iup) {
-			continue;
-		} else if (i && alg->batt_volt <= vdown) {
-			vstep = sc[i - 1].volt;
-			istep = (alg->pdata->ddata->battery_capacity_mah *
-				 sc[i - 1].c_curr[BATTERY_CHARGALG_NUM]) /
-				sc[i - 1].c_curr[BATTERY_CHARGALG_DENOM];
-			alg->step_charging_idx = i - 1;
-			break;
-		} else {
-			vstep = sc[i].volt;
-			istep = (alg->pdata->ddata->battery_capacity_mah *
-				 sc[i].c_curr[BATTERY_CHARGALG_NUM]) /
-				sc[i].c_curr[BATTERY_CHARGALG_DENOM];
-			alg->step_charging_idx = i;
-			break;
-		}
-	}
-
-	dev_dbg(alg->dev, "[step chg] Vctrl %u mV, Ictrl %d mA\n",
-		vstep, istep);
-
-	alg->ctrl.volt = min(alg->ctrl.volt, vstep);
-	alg->ctrl.curr = min(alg->ctrl.curr, istep);
-
-	dev_dbg(alg->dev, "[steg chg out] Vctrl %u mV, Ictrl %d mA\n",
-		alg->ctrl.volt, alg->ctrl.curr);
-}
-#endif /* CONFIG_BATTERY_CHARGALG_ENABLE_STEP_CHARGING */
-
 static void battery_chargalg_control_charger_ambient(
 	struct battery_chargalg_driver *alg, u16 *vlim, u16 *ilim)
 {
@@ -1233,12 +1133,13 @@ static void battery_chargalg_control_charger_ambient(
 	int changed_limit = -1;
 	u8 *tlim_base = NULL;
 	u8 *tlim_hyst = NULL;
-	struct ambient_temperature_limit *limit_tbl =
-		alg->pdata->ddata->limit_tbl;
+	struct ambient_temperature_data *amb_temp
+					= alg->control->ambient_temp;
 
-	if (POWER_SUPPLY_TECHNOLOGY_UNKNOWN != alg->batt_tech && limit_tbl) {
-		tlim_base = limit_tbl->base;
-		tlim_hyst = limit_tbl->hyst;
+	if (POWER_SUPPLY_TECHNOLOGY_UNKNOWN != alg->batt_tech &&
+						amb_temp->limit_tbl) {
+		tlim_base = amb_temp->limit_tbl->base;
+		tlim_hyst = amb_temp->limit_tbl->hyst;
 	}
 
 	if (!tlim_base || !tlim_hyst || alg->temp_amb == alg->temp_amb_old ||
@@ -1325,13 +1226,13 @@ static void battery_chargalg_control_charger(
 	alg->current_control_counter = 0;
 
 	if (POWER_SUPPLY_TECHNOLOGY_UNKNOWN == alg->batt_tech) {
-		if (alg->pdata->unid_bat_reg) {
-			vlim = alg->pdata->unid_bat_reg->volt;
-			ilim = alg->pdata->unid_bat_reg->curr;
+		if (alg->control->unid_bat_reg) {
+			vlim = alg->control->unid_bat_reg->volt;
+			ilim = alg->control->unid_bat_reg->curr;
 		}
-	} else if (alg->pdata->id_bat_reg) {
-		vlim = alg->pdata->id_bat_reg->volt;
-		ilim = alg->pdata->id_bat_reg->curr;
+	} else if (alg->control->id_bat_reg) {
+		vlim = alg->control->id_bat_reg->volt;
+		ilim = alg->control->id_bat_reg->curr;
 	}
 
 	if (!vlim || !ilim) {
@@ -1362,27 +1263,20 @@ static void battery_chargalg_control_charger(
 		}
 	}
 
-	alg->ctrl.curr = min(alg->ctrl.curr,
-			     alg->pdata->ddata->maximum_charging_current_ma);
-
-#ifdef CONFIG_BATTERY_CHARGALG_ENABLE_STEP_CHARGING
-	battery_chargalg_control_step(alg);
-#endif
-
 	if (alg->enable_ambient_temp)
 		battery_chargalg_control_charger_ambient(alg, vlim, ilim);
 
 	if (!alg->ctrl.onoff && alg->chg_connected &&
-	    alg->pdata->turn_on_charger) {
-		(void)alg->pdata->turn_on_charger(
+	    alg->control->turn_on_charger) {
+		(void)alg->control->turn_on_charger(
 			alg->chg_connected & USB_CHG);
 		alg->ctrl.onoff = 1;
 	}
 
-	if (alg->pdata->set_input_current_limit &&
+	if (alg->control->set_input_current_limit &&
 	    alg->chg_curr != alg->ctrl.psy_curr) {
 		alg->ctrl.psy_curr = alg->chg_curr;
-		(void)alg->pdata->set_input_current_limit(alg->ctrl.psy_curr);
+		(void)alg->control->set_input_current_limit(alg->ctrl.psy_curr);
 	}
 
 	dev_dbg(alg->dev,
@@ -1395,17 +1289,17 @@ static void battery_chargalg_control_charger(
 				alg->ctrl.curr, alg->ctrl.volt,
 				alg->eoc.active, alg->temp_amb_limit);
 
-	if (alg->pdata->set_charger_voltage &&
+	if (alg->control->set_charger_voltage &&
 	    alg->ctrl.volt != old_ctrl.volt)
-		(void)alg->pdata->set_charger_voltage(alg->ctrl.volt);
+		(void)alg->control->set_charger_voltage(alg->ctrl.volt);
 
-	if (alg->pdata->set_charger_current &&
+	if (alg->control->set_charger_current &&
 	    alg->ctrl.curr != old_ctrl.curr)
-		(void)alg->pdata->set_charger_current(alg->ctrl.curr);
+		(void)alg->control->set_charger_current(alg->ctrl.curr);
 
 	if (alg->ctrl.onoff && !alg->chg_connected &&
-	    alg->pdata->turn_off_charger) {
-		(void)alg->pdata->turn_off_charger();
+	    alg->control->turn_off_charger) {
+		(void)alg->control->turn_off_charger();
 		alg->ctrl.onoff = 0;
 	}
 
@@ -1427,7 +1321,7 @@ static void battery_chargalg_worker(struct work_struct *work)
 			dev_info(alg->dev, "Trying external again...\n");
 			battery_chargalg_schedule_delayed_work(&alg->work, HZ);
 		} else {
-			dev_err(alg->dev, "Externals unavailable.\n");
+			dev_info(alg->dev, "Externals unavailable.\n");
 			return;
 		}
 	}
@@ -1444,7 +1338,7 @@ static void battery_chargalg_worker(struct work_struct *work)
 	if (alg->chg_connected) {
 		u8 delay_time = ALGORITHM_UPDATE_TIME_S;
 
-		if (alg->pdata->allow_dynamic_charge_current_ctrl &&
+		if (alg->control->allow_dynamic_charge_current_ctrl &&
 		    alg->state == BATT_ALG_STATE_WARM)
 			delay_time = CURRENT_CONTROL_CHECK_TIME_S;
 
@@ -1486,9 +1380,9 @@ void battery_chargalg_disable(bool disable)
 
 	dev_dbg(alg->dev, "%s(): dis=%d\n", __func__, disable);
 
-	MUTEX_LOCK(&alg->disable_lock);
+	MUTEX_LOCK(&alg->lock);
 	alg->disable_algorithm = (u8)disable;
-	MUTEX_UNLOCK(&alg->disable_lock);
+	MUTEX_UNLOCK(&alg->lock);
 
 	battery_chargalg_schedule_delayed_work(&alg->work, 0);
 	return;
@@ -1511,26 +1405,13 @@ static int battery_chargalg_probe(struct platform_device *pdev)
 	if (!alg)
 		return -ENOMEM;
 
-	alg->pdata = pdev->dev.platform_data;
-	if (!alg->pdata->ddata ||
-	    !alg->pdata->ddata->battery_capacity_mah ||
-	    !alg->pdata->ddata->maximum_charging_current_ma) {
-		dev_err(&pdev->dev, "Check your device data!"
-			" Either it is missing or battery capacity C[mAh]"
-			" and/or maximum charging current is not define.\n");
+	alg->control = pdev->dev.platform_data;
+	if (!alg->control->battery_capacity_mah) {
+		dev_err(&pdev->dev,
+			"Battery capacity C[mAh] not set in platform data.\n");
 		kfree(alg);
 		return -EINVAL;
 	}
-
-#ifdef CONFIG_BATTERY_CHARGALG_ENABLE_STEP_CHARGING
-	if (!alg->pdata->ddata->step_charging ||
-	    !alg->pdata->ddata->num_step_charging) {
-		dev_err(&pdev->dev, "Step charging is enabled but configuration"
-			" is missing in device data.\n");
-		kfree(alg);
-		return -EINVAL;
-	}
-#endif
 
 	INIT_WORK(&alg->ext_pwr_changed_work,
 		  battery_chargalg_ext_pwr_changed_worker);
@@ -1540,15 +1421,14 @@ static int battery_chargalg_probe(struct platform_device *pdev)
 	INIT_DELAYED_WORK(&alg->eoc.work, battery_chargalg_eoc_worker);
 	INIT_DELAYED_WORK(&alg->ovp.work, battery_chargalg_ovp_worker);
 	mutex_init(&alg->lock);
-	mutex_init(&alg->disable_lock);
 
 	alg->dev = &pdev->dev;
-	alg->ps.name = alg->pdata->name;
+	alg->ps.name = alg->control->name;
 	alg->ps.type = POWER_SUPPLY_TYPE_BATTERY;
 	alg->ps.properties = alg_props;
 	alg->ps.num_properties = ARRAY_SIZE(alg_props);
-	alg->ps.supplied_to = alg->pdata->supplied_to;
-	alg->ps.num_supplicants = alg->pdata->num_supplicants;
+	alg->ps.supplied_to = alg->control->supplied_to;
+	alg->ps.num_supplicants = alg->control->num_supplicants;
 	alg->ps.get_property = battery_chargalg_get_property;
 	alg->ps.external_power_changed = battery_chargalg_ext_pwr_changed;
 	alg->batt_health = POWER_SUPPLY_HEALTH_UNKNOWN;
@@ -1558,7 +1438,7 @@ static int battery_chargalg_probe(struct platform_device *pdev)
 	 * when charging current is minumum 'STOP_SAFETY_TIMER_CURRENT_MA' mA.
 	 */
 	alg->safety_timer.timeout =
-		(alg->pdata->ddata->battery_capacity_mah * 60) /
+		(*alg->control->battery_capacity_mah * 60) /
 		(STOP_SAFETY_TIMER_CURRENT_MA * 100);
 
 	platform_set_drvdata(pdev, alg);

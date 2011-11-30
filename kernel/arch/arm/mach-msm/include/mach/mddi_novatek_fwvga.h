@@ -30,7 +30,5 @@ extern const struct panel_id novatek_panel_id_sony_acx427ak;
 extern const struct panel_id novatek_panel_id_sony_acx424ak;
 extern const struct panel_id novatek_panel_id_hitachi_dx09d09vm_type1;
 extern const struct panel_id novatek_panel_id_hitachi_dx09d09vm;
-extern const struct panel_id novatek_panel_id_sharp_ls033t3lx01;
-extern const struct panel_id novatek_panel_id_tmd_lt033mdv1000;
 
 #endif

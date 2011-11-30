@@ -163,12 +163,4 @@ config BATTERY_CHARGALG
 	help
 	  Say Y to enable charging algorithm for batteries.
 
-config BATTERY_CHARGALG_ENABLE_STEP_CHARGING
-	bool "Enable step charging"
-	depends on BATTERY_CHARGALG
-	default n
-	help
-	  Say Y to enable step charging. Step charging controls the maximum
-	  charging current relative to the actual battery voltage.
-
 endif # POWER_SUPPLY

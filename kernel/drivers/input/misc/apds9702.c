@@ -50,7 +50,6 @@ struct apds9702data {
 	struct mutex lock;
 	int interrupt;
 	u16 ctl_reg;
-	unsigned int hidden_bit;
 	unsigned int active:1;
 };
 
@@ -167,19 +166,6 @@ static ssize_t attr_threshold_set(struct device *dev,
 	return -EINVAL;
 }
 
-static ssize_t attr_nburst_show(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
-{
-	struct apds9702data *data = dev_get_drvdata(dev);
-	int nburst =
-		(data->ctl_reg & APDS9702_NBURST_MAX << APDS9702_NBURST_BIT)
-		>> APDS9702_NBURST_BIT;
-
-	nburst |= data->hidden_bit;
-	return snprintf(buf, PAGE_SIZE, "%d\n", nburst);
-}
-
 static ssize_t attr_nburst_set(struct device *dev,
 				   struct device_attribute *attr,
 				   const char *buf, size_t size)
@@ -188,13 +174,12 @@ static ssize_t attr_nburst_set(struct device *dev,
 	unsigned long nb;
 	struct apds9702data *data = dev_get_drvdata(dev);
 	ret = strict_strtoul(buf, 10, &nb);
-	if (!ret) {
+	if (!ret && nb <= APDS9702_NBURST_MAX) {
 		mutex_lock(&data->lock);
-		data->hidden_bit = nb & 16;
-		nb &= ~(16);
 		data->ctl_reg = (data->ctl_reg &
 			~(APDS9702_NBURST_MAX << APDS9702_NBURST_BIT)) |
 			(nb << APDS9702_NBURST_BIT);
+		dev_dbg(dev, "%s nburst is %ld\n", __func__, nb);
 		mutex_unlock(&data->lock);
 		return size;
 	}
@@ -263,7 +248,7 @@ static ssize_t attr_rfilt_set(struct device *dev,
 
 static struct device_attribute attributes[] = {
 	__ATTR(threshold, 0600, attr_threshold_show, attr_threshold_set),
-	__ATTR(nburst, 0600, attr_nburst_show, attr_nburst_set),
+	__ATTR(nburst, 0200, NULL, attr_nburst_set),
 	__ATTR(freq, 0200, NULL, attr_freq_set),
 	__ATTR(cycle, 0200, NULL, attr_duration_cycle_set),
 	__ATTR(filter, 0200, NULL, attr_rfilt_set),

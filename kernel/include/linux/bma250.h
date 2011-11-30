@@ -52,56 +52,32 @@
 #define BMA250_RANGE_2G                  0x03
 
 #define BMA250_BW_SEL_REG                0x10
-#define BMA250_BW_7_81HZ                 0x08
-#define BMA250_BW_15_63HZ                0x09
-#define BMA250_BW_31_25HZ                0x0A
 #define BMA250_BW_62_50HZ                0x0B
 #define BMA250_BW_125HZ                  0x0C
 #define BMA250_BW_250HZ                  0x0D
 #define BMA250_BW_500HZ                  0x0E
-#define BMA250_BW_1000HZ                 0x0F
 
 #define BMA250_MODE_CTRL_REG             0x11
-#define BMA250_MODE_NOSLEEP              0x00
-#define BMA250_MODE_SLEEP_0_5MS          0x4A
-#define BMA250_MODE_SLEEP_1MS            0x4C
-#define BMA250_MODE_SLEEP_2MS            0x4E
-#define BMA250_MODE_SLEEP_4MS            0x50
-#define BMA250_MODE_SLEEP_6MS            0x52
-#define BMA250_MODE_SLEEP_10MS           0x54
-#define BMA250_MODE_SLEEP_25MS           0x56
 #define BMA250_MODE_SLEEP_50MS           0x58
 #define BMA250_MODE_SLEEP_100MS          0x5A
-#define BMA250_MODE_SLEEP_500MS          0x5C
-#define BMA250_MODE_SLEEP_1000MS         0x5E
 #define BMA250_MODE_SUSPEND              0x80
-#define BMA250_MODE_LOWPOWER             0x40
-
 
 #define BMA250_RESET_REG                 0x14
 #define BMA250_RESET                     0xB6
 
 #define BMA250_INT_ENABLE1_REG           0x16
-#define BMA250_INT_FLAT                  0x80
-#define BMA250_INT_ORIENT                0x40
-#define BMA250_INT_S_TAP                 0x20
-#define BMA250_INT_D_TAP                 0x10
 #define BMA250_INT_SLOPE_Z               0x04
 #define BMA250_INT_SLOPE_Y               0x02
 #define BMA250_INT_SLOPE_X               0x01
 
 #define BMA250_INT_ENABLE2_REG           0x17
 #define BMA250_INT_NEW_DATA              0x10
-#define BMA250_INT_LOW_G                 0x08
+#define BMA250_INT_LOW_G                 0x04
 #define BMA250_INT_HIGH_G_Z              0x04
 #define BMA250_INT_HIGH_G_Y              0x02
 #define BMA250_INT_HIGH_G_X              0x01
 
 #define BMA250_INT_PIN1_REG              0x19
-#define BMA250_INT_PIN1_FLAT             0x80
-#define BMA250_INT_PIN1_ORIENT           0x40
-#define BMA250_INT_PIN1_S_TAP            0x20
-#define BMA250_INT_PIN1_D_TAP            0x10
 #define BMA250_INT_PIN1_SLOPE            0x04
 #define BMA250_INT_PIN1_HIGH_G           0x02
 #define BMA250_INT_PIN1_LOW_G            0x01
@@ -111,20 +87,12 @@
 #define BMA250_INT_PIN1                  0x01
 
 #define BMA250_INT_PIN2_REG              0x1B
-#define BMA250_INT_PIN2_FLAT             0x80
-#define BMA250_INT_PIN2_ORIENT           0x40
-#define BMA250_INT_PIN2_S_TAP            0x20
-#define BMA250_INT_PIN2_D_TAP            0x10
 #define BMA250_INT_PIN2_SLOPE            0x04
 #define BMA250_INT_PIN2_HIGH_G           0x02
 #define BMA250_INT_PIN2_LOW_G            0x01
 
 #define BMA250_INT_CTRL_REG              0x21
 #define BMA250_INT_RESET                 0x80
-#define BMA250_INT_MODE_LATCHED          0x0F
-
-#define BMA250_SLOPE_DUR                 0x27
-#define BMA250_SLOPE_THR                 0x28
 
 struct registers {
 	int range;

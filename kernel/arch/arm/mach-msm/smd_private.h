@@ -140,6 +140,9 @@ enum {
 #define SMSM_MODEM_WAIT        0x02000000
 #define SMSM_MODEM_BREAK       0x04000000
 #define SMSM_MODEM_CONTINUE    0x08000000
+#ifdef CONFIG_KEXEC
+#define SMSM_APPS_CRASHDUMP    0x10000000
+#endif
 #define SMSM_UNKNOWN           0x80000000
 
 #define SMSM_WKUP_REASON_RPC	0x00000001
@@ -162,6 +165,10 @@ void smsm_print_sleep_info(uint32_t sleep_delay, uint32_t sleep_limit,
 void smsm_reset_modem(unsigned mode);
 void smsm_reset_modem_cont(void);
 void smd_sleep_exit(void);
+
+#ifdef CONFIG_KEXEC
+void smsm_notify_apps_crashdump(void);
+#endif
 
 #define SMEM_NUM_SMD_STREAM_CHANNELS        64
 #define SMEM_NUM_SMD_BLOCK_CHANNELS         64

@@ -28,6 +28,9 @@
 /* Internal version number */
 #define MDDI_DRIVER_VERSION 0x0003
 
+/* Todo: Remove. Change panel ID function for SW sample */
+/*#define ENABLE_FOR_SW_SAMPLE*/
+
 /* DISPLAY ID value */
 #define MDDI_SONY_CELL_ID1 0x02
 #define MDDI_SONY_CELL_ID2 0xA1
@@ -42,6 +45,7 @@ enum lcd_registers_t {
 	LCD_REG_COLUMN_ADDRESS = 0x2a,
 	LCD_REG_PAGE_ADDRESS = 0x2b,
 	LCD_REG_DRIVER_IC_ID = 0xA1, /* TODO: check: temp SW sample */
+	LCD_REG_CELL_ID = 0xDA,
 	LCD_REG_MODULE_ID = 0xDB,
 	LCD_REG_REVISION_ID = 0xDC
 };
@@ -161,7 +165,6 @@ static DEVICE_ATTR(debug, 0644, show_debug_ctrl, store_debug_ctrl);
 enum mddi_sony_lcd_state {
 	LCD_STATE_OFF,
 	LCD_STATE_POWER_ON,
-	LCD_STATE_DISPLAY_OFF,
 	LCD_STATE_ON,
 	LCD_STATE_SLEEP
 };
@@ -202,7 +205,7 @@ static void sony_lcd_dbc_on(void)
 		MDDI_DEBUG(LEVEL_PARAM, "dbc_ctrl = %d\n", dbc_ctrl);
 
 		/* Manual brightness */
-		write_client_reg_nbr(0x51, 0x000000FD, 0, 0, 0, 1);
+		write_client_reg_nbr(0x51, 0x000000FF, 0, 0, 0, 1);
 
 		/* Minimum Brightness */
 		write_client_reg_nbr(0x5E, 0x00000000, 0, 0, 0, 1);
@@ -275,8 +278,7 @@ static void sony_lcd_driver_init(struct platform_device *pdev)
 		{
 			/* DISCTL */
 			static uint32 reg_disctl[5] = {
-				0x080F4E3B, 0x00080808, 0x00000808,
-				0x084E0000, 0x00202008};
+				0x080F4E3B, 0x00080808, 0x00000808, 0x084E0000, 0x00000546};
 			write_client_reg_xl(0xF2, reg_disctl, 5);
 		}
 
@@ -299,51 +301,29 @@ static void sony_lcd_driver_init(struct platform_device *pdev)
 		/* PANELCTL */
 		write_client_reg_nbr(0xF8, 0x00000055, 0, 0, 0, 1);
 
-		/* GAMMSEL RED*/
-		write_client_reg_nbr(0xF9, 0x00000014, 0, 0, 0, 1);
+		/* GAMMSEL */
+		write_client_reg_nbr(0xF9, 0x00000027, 0, 0, 0, 1);
 
 		/* PGAMMACTL */
-		write_client_reg_nbr(0xFA, 0x1001031C, 0x2E140D0B,
-				0x30303737, 0x00000011, 4);
+		write_client_reg_nbr(0xFA, 0x2106030B, 0x1E272321,
+				0x2A2B2B2A, 0x00000014, 4);
 
 		/* NGAMMACTL */
-		write_client_reg_nbr(0xFB, 0x3011140B, 0x2E373730,
-				0x100B0D14, 0x00000001, 4);
-
-		/* GAMMSEL GREEN*/
-		write_client_reg_nbr(0xF9, 0x00000012, 0, 0, 0, 1);
-
-		/* PGAMMACTL */
-		write_client_reg_nbr(0xFA, 0x19040315, 0x261F1B18,
-				0x2D2D3231, 0x00000011, 4);
-
-		/* NGAMMACTL */
-		write_client_reg_nbr(0xFB, 0x2D110D0B, 0x2631322D,
-				0x19181B1F, 0x00000004, 4);
-
-		/* GAMMSEL BLUE*/
-		write_client_reg_nbr(0xF9, 0x00000011, 0, 0, 0, 1);
-
-		/* PGAMMACTL */
-		write_client_reg_nbr(0xFA, 0x1503030B, 0x22221C16,
-				0x2B2B2F2D, 0x00000011, 4);
-
-		/* NGAMMACTL */
-		write_client_reg_nbr(0xFB, 0x2B11030B, 0x222D2F2B,
-				0x15161C22, 0x00000003, 4);
+		write_client_reg_nbr(0xFB, 0x2A14030B, 0x1E2A2B2B,
+				0x21212327, 0x00000006, 4);
 
 		/* MIECTRL */
-		write_client_reg_nbr(0xC0, 0x00108036, 0, 0, 0, 1);
+		write_client_reg_nbr(0xC0, 0x00108080, 0, 0, 0, 1);
 
 		/* BCMODE */
-		write_client_reg_nbr(0xC1, 0x00000013, 0, 0, 0, 1);
+		write_client_reg_nbr(0xC1, 0x00000012, 0, 0, 0, 1);
 
 		/* WRMIECTL */
 		write_client_reg_nbr(0xC2, 0x01000008, 0x010000DF,
 				0x0000003F, 0, 3);
 
 		/* WRBLCTL */
-		write_client_reg_nbr(0xC3, 0x0021D000, 0, 0, 0, 1);
+		write_client_reg_nbr(0xC3, 0x00203501, 0, 0, 0, 1);
 
 		/* PASSWD1 */
 		write_client_reg_nbr(0xF0, 0x0000A5A5, 0, 0, 0, 1);
@@ -356,11 +336,14 @@ static void sony_lcd_driver_init(struct platform_device *pdev)
 
 static void sony_lcd_window_adjust(uint16 x1, uint16 x2, uint16 y1, uint16 y2)
 {
+	MDDI_DEBUG(LEVEL_PARAM, "%s [%d]\n", __func__, lcd_state);
 
 	mutex_lock(&mddi_mutex);
 
+	MDDI_DEBUG(LEVEL_TRACE, "%s (column) [%d, %d]\n", __func__, x1, x2);
 	sony_lcd_window_address_set(LCD_REG_COLUMN_ADDRESS, x1, x2);
 
+	MDDI_DEBUG(LEVEL_TRACE, "%s (page) [%d, %d]\n", __func__, y1, y2);
 	sony_lcd_window_address_set(LCD_REG_PAGE_ADDRESS, y1, y2);
 
 #ifdef TEMP_REMOVE_FOR_HW_BUG_FIX
@@ -383,9 +366,6 @@ static void sony_lcd_window_adjust(uint16 x1, uint16 x2, uint16 y1, uint16 y2)
 		write_client_reg_nbr(0x2C, 0, 0, 0, 0, 1);
 #endif
 
-	/* Workaround: 0x3Ch at start of column bug */
-	write_client_reg_nbr(0x3C, 0, 0, 0, 0, 1);
-
 	mutex_unlock(&mddi_mutex);
 }
 
@@ -393,18 +373,12 @@ static void sony_lcd_enter_sleep(void)
 {
 	MDDI_DEBUG(LEVEL_TRACE, "%s [%d]\n", __func__, lcd_state);
 
-	/* Sleep in */
-	write_client_reg_nbr(0x10, 0, 0, 0, 0, 1);
-	mddi_wait(120); /* >120 ms */
-}
-
-static void sony_lcd_display_off(void)
-{
-	MDDI_DEBUG(LEVEL_TRACE, "%s [%d]\n", __func__, lcd_state);
-
 	/* Display off */
 	write_client_reg_nbr(0x28, 0, 0, 0, 0, 1);
 	mddi_wait(50); /* >50 ms */
+	/* Sleep in */
+	write_client_reg_nbr(0x10, 0, 0, 0, 0, 1);
+	mddi_wait(120); /* >120 ms */
 }
 
 
@@ -415,11 +389,6 @@ static void sony_lcd_exit_sleep(void)
 	/* Sleep out */
 	write_client_reg_nbr(0x11, 0x00000000, 0, 0, 0, 1);
 	mddi_wait(120); /* >120 ms */
-}
-
-static void sony_lcd_display_on(void)
-{
-	MDDI_DEBUG(LEVEL_TRACE, "%s [%d]\n", __func__, lcd_state);
 
 	/* Display on */
 	write_client_reg_nbr(0x29, 0x00000000, 0, 0, 0, 1);
@@ -478,7 +447,7 @@ static void sony_power_off(struct platform_device *pdev)
 	}
 }
 
-static int mddi_sony_ic_on_panel_off(struct platform_device *pdev)
+static int mddi_sony_lcd_on(struct platform_device *pdev)
 {
 	MDDI_DEBUG(LEVEL_TRACE, "%s [%d]\n", __func__, lcd_state);
 
@@ -494,37 +463,6 @@ static int mddi_sony_ic_on_panel_off(struct platform_device *pdev)
 			sony_lcd_driver_init(pdev);
 			sony_lcd_exit_sleep();
 			sony_lcd_dbc_on();
-			lcd_state = LCD_STATE_DISPLAY_OFF;
-			break;
-
-		case LCD_STATE_SLEEP:
-			sony_lcd_exit_deepstandby(pdev);
-			sony_lcd_driver_init(pdev);
-			sony_lcd_exit_sleep();
-			sony_lcd_dbc_on();
-			lcd_state = LCD_STATE_DISPLAY_OFF;
-			break;
-
-		default:
-			break;
-		}
-	}
-	mutex_unlock(&mddi_mutex);
-	return 0;
-}
-
-static int mddi_sony_ic_on_panel_on(struct platform_device *pdev)
-{
-	MDDI_DEBUG(LEVEL_TRACE, "%s [%d]\n", __func__, lcd_state);
-
-	mutex_lock(&mddi_mutex);
-	if (power_ctrl) {
-		switch (lcd_state) {
-		case LCD_STATE_POWER_ON:
-			sony_lcd_driver_init(pdev);
-			sony_lcd_exit_sleep();
-			sony_lcd_dbc_on();
-			sony_lcd_display_on();
 			lcd_state = LCD_STATE_ON;
 			break;
 
@@ -533,12 +471,6 @@ static int mddi_sony_ic_on_panel_on(struct platform_device *pdev)
 			sony_lcd_driver_init(pdev);
 			sony_lcd_exit_sleep();
 			sony_lcd_dbc_on();
-			sony_lcd_display_on();
-			lcd_state = LCD_STATE_ON;
-			break;
-
-		case LCD_STATE_DISPLAY_OFF:
-			sony_lcd_display_on();
 			lcd_state = LCD_STATE_ON;
 			break;
 
@@ -554,7 +486,7 @@ static int mddi_sony_ic_on_panel_on(struct platform_device *pdev)
 }
 
 
-static int mddi_sony_ic_off_panel_off(struct platform_device *pdev)
+static int mddi_sony_lcd_off(struct platform_device *pdev)
 {
 	MDDI_DEBUG(LEVEL_TRACE, "%s [%d]\n", __func__, lcd_state);
 
@@ -567,7 +499,6 @@ static int mddi_sony_ic_off_panel_off(struct platform_device *pdev)
 			break;
 
 		case LCD_STATE_ON:
-			sony_lcd_display_off();
 			sony_lcd_dbc_off();
 			sony_lcd_enter_sleep();
 			sony_lcd_enter_deepstandby();
@@ -577,13 +508,6 @@ static int mddi_sony_ic_off_panel_off(struct platform_device *pdev)
 		case LCD_STATE_SLEEP:
 			sony_power_off(pdev);
 			lcd_state = LCD_STATE_OFF;
-			break;
-
-		case LCD_STATE_DISPLAY_OFF:
-			sony_lcd_dbc_off();
-			sony_lcd_enter_sleep();
-			sony_lcd_enter_deepstandby();
-			lcd_state = LCD_STATE_SLEEP;
 			break;
 
 		case LCD_STATE_OFF:
@@ -779,11 +703,9 @@ static ssize_t store_power_ctrl(struct device *dev_p,
 		sony_lcd_driver_init(pdev);
 		sony_lcd_exit_sleep();
 		sony_lcd_dbc_on();
-		sony_lcd_display_on();
 		lcd_state = LCD_STATE_ON;
 	} else {
 		power_ctrl = POWER_OFF;
-		sony_lcd_display_off();
 		sony_lcd_dbc_off();
 		sony_lcd_enter_sleep();
 		sony_power_off(pdev);
@@ -836,35 +758,63 @@ static int check_panel_ids(void)
 
 	mutex_lock(&sony_panel_ids_lock);
 
+#ifdef ENABLE_FOR_SW_SAMPLE
 	ret = mddi_host_register_read(LCD_REG_DRIVER_IC_ID,
-					&panel_ids.driver_ic_id,
-					1, MDDI_HOST_PRIM);
+			&panel_ids.driver_ic_id, 1, MDDI_HOST_PRIM);
 	if (ret < 0) {
-		MDDI_ERROR("%s Failed to read LCD_REG_DRIVER_IC_ID\n",
+		MDDI_DEBUG(LEVEL_TRACE, "%s Failed to read LCD_REG_DRIVER_IC_ID\n",
 							DBG_STR);
 		mutex_unlock(&sony_panel_ids_lock);
 		return -ENODEV;
 	}
 
-	if ((panel_ids.driver_ic_id & 0xFF) != MDDI_SONY_DISPLAY_DRIVER_IC_ID) {
+	ret = mddi_host_register_read(LCD_REG_CELL_ID, &panel_ids.cell_id,
+				      1, MDDI_HOST_PRIM);
+	if (ret < 0) {
+		MDDI_DEBUG(LEVEL_TRACE, "%s Failed to read LCD_REG_CELL_ID\n",
+							DBG_STR);
+		panel_ids.cell_id = 0xFF;
+	}
+#else
+	ret = mddi_host_register_read(LCD_REG_CELL_ID, &panel_ids.cell_id,
+				      1, MDDI_HOST_PRIM);
+	if ((ret < 0)) {
+		MDDI_DEBUG(LEVEL_TRACE, "%s Failed to read LCD_REG_CELL_ID\n",
+							DBG_STR);
+		mutex_unlock(&sony_panel_ids_lock);
+		return -ENODEV;
+	}
+
+	if (((panel_ids.cell_id & 0xFF) != MDDI_SONY_CELL_ID1) &&
+		((panel_ids.cell_id & 0xFF) != MDDI_SONY_CELL_ID2)) {
 		MDDI_DEBUG(LEVEL_TRACE, "%s This is not sony LCD\n",
 							DBG_STR);
 		mutex_unlock(&sony_panel_ids_lock);
 		return -ENODEV;
 	}
 
-	ret = mddi_host_register_read(LCD_REG_MODULE_ID,
-					&panel_ids.module_id,
-					1, MDDI_HOST_PRIM);
+	ret = mddi_host_register_read(LCD_REG_DRIVER_IC_ID,
+			&panel_ids.driver_ic_id, 1, MDDI_HOST_PRIM);
 	if (ret < 0) {
-		MDDI_ERROR("%s Failed to read LCD_REG_MODULE_ID\n", DBG_STR);
+		MDDI_DEBUG(LEVEL_TRACE, "%s Failed to read LCD_REG_DRIVER_IC_ID\n",
+							DBG_STR);
+		panel_ids.driver_ic_id = 0xFF;
+	}
+#endif
+
+	ret = mddi_host_register_read(LCD_REG_MODULE_ID, &panel_ids.module_id,
+							1, MDDI_HOST_PRIM);
+	if (ret < 0) {
+		MDDI_DEBUG(LEVEL_TRACE, "%s Failed to read LCD_REG_MODULE_ID\n",
+							DBG_STR);
 		panel_ids.module_id = 0xFF;
 	}
 	ret = mddi_host_register_read(LCD_REG_REVISION_ID,
-					&panel_ids.revision_id,
-					1, MDDI_HOST_PRIM);
+						&panel_ids.revision_id,
+						1, MDDI_HOST_PRIM);
 	if (ret < 0) {
-		MDDI_ERROR("%s Failed to read LCD_REG_REVISION_ID\n", DBG_STR);
+		MDDI_DEBUG(LEVEL_TRACE, "%s Failed to read LCD_REG_REVISION_ID\n",
+							DBG_STR);
 		panel_ids.revision_id = 0xFF;
 	}
 
@@ -900,11 +850,11 @@ static int mddi_sony_lcd_probe(struct platform_device *pdev)
 
 
 	if (!check_panel_ids()) {
-		MDDI_DEBUG(LEVEL_TRACE,
-				"%s Found display with module ID = 0x%x, "
-				"revision ID = 0x%x, driver IC ID = 0x%x, "
-				"driver ID = 0x%x\n",
-				DBG_STR, panel_ids.module_id & 0xFF,
+		MDDI_DEBUG(LEVEL_TRACE, "%s Found display with cell ID = 0x%x, "
+				"module ID = 0x%x, revision ID = 0x%x, "
+				"driver IC ID = 0x%x, driver ID = 0x%x\n",
+				DBG_STR, panel_ids.cell_id & 0xFF,
+				panel_ids.module_id & 0xFF,
 				panel_ids.revision_id & 0xFF,
 				panel_ids.driver_ic_id & 0xFF,
 				MDDI_DRIVER_VERSION);
@@ -912,11 +862,10 @@ static int mddi_sony_lcd_probe(struct platform_device *pdev)
 		lcd_state = LCD_STATE_POWER_ON;
 		power_ctrl = POWER_ON;
 
-		panel_data->on  = mddi_sony_ic_on_panel_off;
-		panel_data->controller_on_panel_on = mddi_sony_ic_on_panel_on;
-		panel_data->off = mddi_sony_ic_off_panel_off;
-		panel_data->power_on_panel_at_pan = 0;
-		panel_data->window_adjust = sony_lcd_window_adjust;
+		panel_data->on  = mddi_sony_lcd_on;
+		panel_data->off = mddi_sony_lcd_off;
+		panel_ext->window_adjust =
+						sony_lcd_window_adjust;
 
 		pdev->dev.platform_data = &sony_hvga_panel_data;
 		/* adds mfd on driver_data */
@@ -968,14 +917,12 @@ static void __init msm_mddi_sony_hvga_display_device_init(void)
 	panel_data->panel_info.fb_num = 2;
 	panel_data->panel_info.bl_max = 4;
 	panel_data->panel_info.bl_min = 1;
-	panel_data->panel_info.width = 42;
-	panel_data->panel_info.height = 63;
 
 	panel_data->panel_info.lcd.vsync_enable = TRUE;
 	/*panel_data->panel_info.lcd.vsync_enable = FALSE;*/
-	panel_data->panel_info.lcd.refx100 = 6500;
-	panel_data->panel_info.lcd.v_back_porch = 8;
-	panel_data->panel_info.lcd.v_front_porch = 8;
+	panel_data->panel_info.lcd.refx100 = 8500;
+	panel_data->panel_info.lcd.v_back_porch = 1;
+	panel_data->panel_info.lcd.v_front_porch = 16;
 	panel_data->panel_info.lcd.v_pulse_width = 0;
 	panel_data->panel_info.lcd.hw_vsync_mode = TRUE;
 	panel_data->panel_info.lcd.vsync_notifier_period = 0;

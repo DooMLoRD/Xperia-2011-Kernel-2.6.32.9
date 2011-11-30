@@ -34,6 +34,9 @@
 #include <linux/delay.h>
 #include <linux/mutex.h>
 #include <linux/bma150_ng.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
 #define BMA150_REG_CHIPID		0x00
 #define BMA150_REG_ACCX_LS		0x02
@@ -96,6 +99,10 @@ struct driver_data {
 
 	struct dentry		*dbfs_root;
 	struct dentry		*dbfs_regs;
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend     bma_early_suspend;
+#endif
 
 	struct task_struct	*bma150d;
 	atomic_t		rate_msec;
@@ -406,7 +413,8 @@ static int bma150d(void *data)
 				__func__, rc);
 			mutex_lock(&dd->lock);
 			/* avoid to call kthread_stop() */
-			dd->bma150d = NULL;
+			if (!kthread_should_stop())
+				dd->bma150d = NULL;
 			mutex_unlock(&dd->lock);
 			return rc;
 		}
@@ -431,41 +439,33 @@ static int bma150_kthread_start(struct driver_data *dd)
 	return 0;
 }
 
-#ifdef CONFIG_SUSPEND
-static int bma150_suspend(struct device *dev)
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void bma150_early_suspend(struct early_suspend *handler)
 {
-	struct driver_data *dd = dev_get_drvdata(dev);
-	struct task_struct *ptr;
+	struct driver_data *dd =
+		container_of(handler, struct driver_data, bma_early_suspend);
 
 	mutex_lock(&dd->lock);
 	if (dd->ip_dev->users && dd->bma150d && !IS_ERR(dd->bma150d)) {
-		ptr = dd->bma150d;
+		kthread_stop(dd->bma150d);
 		dd->bma150d = NULL;
-	} else {
-		mutex_unlock(&dd->lock);
-		goto power_down;
 	}
 	mutex_unlock(&dd->lock);
-	kthread_stop(ptr);
 
-power_down:
 	bma150_power_down(dd);
-
-	return 0;
 }
 
-static int bma150_resume(struct device *dev)
+static void bma150_late_resume(struct early_suspend *handler)
 {
-	struct driver_data *dd = dev_get_drvdata(dev);
-	int rc = 0;
+	struct driver_data *dd =
+		container_of(handler, struct driver_data, bma_early_suspend);
 
 	mutex_lock(&dd->lock);
 	if (dd->ip_dev->users && !bma150_power_up(dd) && !bma150_config(dd))
-		rc = bma150_kthread_start(dd);
+		bma150_kthread_start(dd);
 	mutex_unlock(&dd->lock);
-	return rc;
 }
-#endif
+#endif /* CONFIG_HAS_EARLYSUSPEND */
 
 static int bma150_open(struct input_dev *dev)
 {
@@ -676,6 +676,12 @@ static int __devinit bma150_probe(struct i2c_client *ic_dev,
 	if (rc)
 		goto probe_err_reg_dev;
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	dd->bma_early_suspend.suspend = bma150_early_suspend;
+	dd->bma_early_suspend.resume = bma150_late_resume;
+	register_early_suspend(&dd->bma_early_suspend);
+#endif
+
 	return rc;
 
 probe_err_reg_dev:
@@ -707,6 +713,9 @@ static int __devexit bma150_remove(struct i2c_client *ic_dev)
 	if (dd->bma150d && !IS_ERR(dd->bma150d))
 		kthread_stop(dd->bma150d);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&dd->bma_early_suspend);
+#endif
 	remove_sysfs_interfaces(&ic_dev->dev);
 	phys_path = dd->ip_dev->phys;
 	input_unregister_device(dd->ip_dev);
@@ -724,20 +733,10 @@ static const struct i2c_device_id bma150_i2c_id[] = {
 	{}
 };
 
-#ifdef CONFIG_SUSPEND
-static struct dev_pm_ops bma150_pm_ops = {
-	.suspend	= bma150_suspend,
-	.resume		= bma150_resume,
-};
-#endif
-
 static struct i2c_driver bma150_driver = {
 	.driver = {
 		.name	= BMA150_NAME,
 		.owner	= THIS_MODULE,
-#ifdef CONFIG_SUSPEND
-		.pm	= &bma150_pm_ops,
-#endif
 	},
 	.probe		= bma150_probe,
 	.remove		= __devexit_p(bma150_remove),

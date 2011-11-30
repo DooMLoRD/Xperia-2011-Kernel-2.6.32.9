@@ -40,11 +40,10 @@ obj-$(CONFIG_PMIC8058_VIBRATOR) += pmic8058-vibrator.o
 
 obj-$(CONFIG_ZEUS_ESD)		+= zeus_esd.o
 obj-$(CONFIG_PMIC8058_NFC) += pmic8058-nfc.o
+obj-$(CONFIG_CRASH_DUMP) += 	msm_amss_coredump.o
 obj-$(CONFIG_PMIC8058_UPL) += pmic8058-upl.o
 obj-$(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN) \
 	+= msm_migrate_pages.o
 obj-$(CONFIG_LM3560)		+= lm356x.o
 obj-$(CONFIG_LM3561)		+= lm356x.o
 obj-$(CONFIG_FPC_CONNECTOR_TEST) += fpc_connector_test.o
-
-obj-$(CONFIG_SEMC_ONESEG_TUNER_PM) += oneseg_tunerpm_driver.o

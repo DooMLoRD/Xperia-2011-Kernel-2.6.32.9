@@ -400,13 +400,6 @@ config FPC_CONNECTOR_TEST
 	  This option enables support FPC cable
 	  connection test.
 
-config SEMC_ONESEG_TUNER_PM
-	tristate "SEMC Oneseg tuner pm driver for SMT-VJ180"
-	default n
-	depends on GENERIC_GPIO
-	help
-	  Select this module to enable SEMC Oneseg Tuner PM Driver.
-
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

@@ -27,23 +27,6 @@
 #ifndef	_bcmdefs_h_
 #define	_bcmdefs_h_
 
-
-#define bcmreclaimed		0
-#define r2_reclaimed		0
-#define _data	_data
-#define _fn	_fn
-#define _data	_data
-#define _fn		_fn
-#define _fn	_fn
-#define BCMPREATTACHDATA(_data)	_data
-#define BCMPREATTACHFN(_fn)		_fn
-#define CONST	const
-
-
-
-#define _data	_data
-#define _fn		_fn
-#define _fn	_fn
 #define STATIC	static
 
 #define	SI_BUS			0	

@@ -104,11 +104,6 @@ enum as3676_register {
 	AS3676_GROUP_3_X2,
 	AS3676_GROUP_3_K1,
 	AS3676_GROUP_3_K2,
-	AS3676_AUDIO_CTRL_1,
-	AS3676_AUDIO_CTRL_2,
-	AS3676_SINK_3X_AUD_SRC,
-	AS3676_AUDIO_INPUT,
-	AS3676_AUDIO_OUTPUT,
 
 	AS3676_REG_MAX,
 
@@ -289,11 +284,6 @@ static const u8 as3676_i2c_registers[] = {
 	[AS3676_REG_PATTERN_DATA_3] = 0x1c,
 	[AS3676_REG_PATTERN_CTRL] = 0x18,
 #endif
-	[AS3676_AUDIO_CTRL_1]   = 0x46,
-	[AS3676_AUDIO_INPUT]     = 0x47,
-	[AS3676_AUDIO_OUTPUT]   = 0x48,
-	[AS3676_SINK_3X_AUD_SRC]  = 0x53,
-	[AS3676_AUDIO_CTRL_2]   = 0x55,
 	[AS3676_DLS_CTRL_1]     = 0x56,
 	[AS3676_DLS_CTRL_2]     = 0x57,
 	[AS3676_DCDC_CTRL_1]    = 0x21,
@@ -325,48 +315,12 @@ static const u8 as3676_i2c_registers[] = {
 	[AS3676_GROUP_3_K2]     = 0xa9,
 };
 
-static u8 as3676_restore_regs[] = {
-	AS3676_REG_GPIO_CURR,
-	AS3676_DCDC_CTRL_1,
-	AS3676_DCDC_CTRL_2,
-	AS3676_LDO_VOLTAGE,
-	AS3676_MODE_SWITCH,
-	AS3676_REG_PWM_CODE,
-	AS3676_REG_PWM_CTRL,
-	AS3676_AMB_FILTER,
-	AS3676_AMB_OFFSET,
-	AS3676_SINK_1_2_AMB,
-	AS3676_SINK_06_AMB,
-	AS3676_SINK_3X_AMB,
-	AS3676_SINK_4X_AMB,
-	AS3676_AMB_RGB_GRP,
-	AS3676_GROUP_1_Y0,
-	AS3676_GROUP_1_Y3,
-	AS3676_GROUP_1_X1,
-	AS3676_GROUP_1_X2,
-	AS3676_GROUP_1_K1,
-	AS3676_GROUP_1_K2,
-	AS3676_GROUP_2_Y0,
-	AS3676_GROUP_2_Y3,
-	AS3676_GROUP_2_X1,
-	AS3676_GROUP_2_X2,
-	AS3676_GROUP_2_K1,
-	AS3676_GROUP_2_K2,
-	AS3676_GROUP_3_Y0,
-	AS3676_GROUP_3_Y3,
-	AS3676_GROUP_3_X1,
-	AS3676_GROUP_3_X2,
-	AS3676_GROUP_3_K1,
-	AS3676_GROUP_3_K2,
-};
-
 #define AS3676_MAX_CURRENT  38250
 
 #define AS3676_SLOW_PATTERN_BIT_DURATION_MS  250
 #define AS3676_FAST_PATTERN_BIT_DURATION_MS  31
 
 #define AS3676_REG_CTRL_WAIT_US  5000
-#define AS3676_ALS_ENABLE_WAIT_MS 2
 
 /* You can not possibly (probably?) have more interfaces than sinks.... Well,
  * you *could* but it would be really really stupid */
@@ -422,30 +376,20 @@ struct as3676_interface {
 	struct kobject kobj;
 };
 
-enum als_suspend_state {
-	AS3676_NO_SUSPEND = 0,
-	AS3676_SUSPENDED,
-};
-
 struct as3676_record {
 	struct i2c_client *client;
 	struct as3676_interface interfaces[AS3676_INTERFACE_MAX];
 	int n_interfaces;
 	struct work_struct work;
-	struct delayed_work als_resume_work;
-	struct delayed_work als_enabled_work;
+	struct delayed_work delayed_work;
 	u8 registers[AS3676_REG_MAX];
 	u64 dcdcbit;
 	u64 regbit;
 	int als_connected;
 	int als_wait;
-	enum als_suspend_state als_suspend;
 	int dls_connected;
-	int als_enabled;
-	int audio_enabled;
 	enum as3676_cmode cmode;
 	struct as3676_als_config als;
-	struct as3676_audio_config audio;
 	struct mutex lock;
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
@@ -455,14 +399,9 @@ struct as3676_record {
 #define as3676_lock(rd) mutex_lock(&(rd)->lock)
 #define as3676_unlock(rd) mutex_unlock(&(rd)->lock)
 
-static void as3676_als_set_enable_internal(struct as3676_record *rd, u8 enable);
-static void as3676_als_set_enable(struct as3676_record *rd,
-		struct as3676_interface *intf, u8 enable);
+static void as3676_als_set_enable(struct as3676_record *rd, u8 enable);
 static void as3676_als_set_params(struct as3676_record *rd,
 				struct as3676_als_config *param);
-static void as3676_als_set_adc_ctrl(struct as3676_record *rd);
-static void as3676_set_interface_brightness(struct as3676_interface *intf,
-				enum led_brightness value);
 
 static inline u8 reg_get(struct as3676_record *rd, enum as3676_register reg)
 {
@@ -530,45 +469,20 @@ static void as3676_worker(struct work_struct *work)
 	as3676_unlock(rd);
 }
 
-static void as3676_als_resume_worker(struct work_struct *work)
+static void as3676_als_delayed_worker(struct work_struct *work)
 {
 	struct as3676_record *rd;
 	u8 val;
 
-	rd = container_of(work, struct as3676_record, als_resume_work.work);
-
-	as3676_lock(rd);
+	rd = container_of(work, struct as3676_record, delayed_work.work);
 	val = reg_get(rd, AS3676_REG_CTRL);
 
 	if (val) {
-		enum as3676_cmode cmode = rd->cmode;
-
-		rd->cmode = AS3676_CMODE_IMMEDIATE;
-		as3676_als_set_enable_internal(rd, rd->als_enabled);
-		if (!rd->audio_enabled)
-			reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
-		rd->cmode = cmode;
+		as3676_als_set_enable(rd, 1);
+		reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
 	}
-	as3676_unlock(rd);
-}
 
-static void as3676_als_enabled_worker(struct work_struct *work)
-{
-	struct as3676_record *rd;
-	int i;
-
-	rd = container_of(work, struct as3676_record, als_enabled_work.work);
-
-	as3676_lock(rd);
-	rd->als_suspend = AS3676_NO_SUSPEND;
-
-	for (i = 0; i < rd->n_interfaces; ++i) {
-		struct as3676_interface *intf = &rd->interfaces[i];
-		enum led_brightness value;
-		value = intf->cdev.brightness;
-		as3676_set_interface_brightness(intf, value);
-	}
-	as3676_unlock(rd);
+	schedule_work(&rd->work);
 }
 
 static void as3676_set_amb(struct as3676_record *rd, enum as3676_register reg,
@@ -620,8 +534,7 @@ static void as3676_set_als_config(struct as3676_record *rd,
 		break;
 	}
 
-	if (!rd->audio_enabled)
-		reg_set(rd, AS3676_ADC_CTRL, config->source);
+	reg_set(rd, AS3676_ADC_CTRL, config->source);
 
 	switch (group) {
 	case AS3676_AMB_GROUP_1:
@@ -690,35 +603,6 @@ static void as3676_get_als_config(struct as3676_record *rd,
 	}
 }
 
-static void as3676_audio_set_config(struct as3676_record *rd, u8 enable)
-{
-	int als_status = 0;
-
-	rd->audio_enabled = enable;
-
-	if (enable) {
-		als_status = rd->als_enabled;
-		as3676_als_set_enable_internal(rd, 0);
-		as3676_als_set_adc_ctrl(rd);
-		rd->als_enabled = als_status;
-		reg_set(rd, AS3676_SINK_3X_AUD_SRC, rd->audio.current_3x);
-		reg_set(rd, AS3676_AUDIO_CTRL_1, rd->audio.audio_control);
-		reg_set(rd, AS3676_AUDIO_INPUT, rd->audio.audio_input);
-		reg_set(rd, AS3676_AUDIO_OUTPUT, rd->audio.audio_output);
-		reg_set(rd, AS3676_ADC_CTRL, AS3676_ALS_SOURCE_AUDIO);
-	} else {
-		as3676_als_set_enable_internal(rd, rd->als_enabled);
-		reg_set(rd, AS3676_SINK_3X_AUD_SRC, 0x00);
-		reg_set(rd, AS3676_AUDIO_CTRL_1, 0x00);
-		reg_set(rd, AS3676_AUDIO_INPUT, 0x00);
-		reg_set(rd, AS3676_AUDIO_OUTPUT, 0x00);
-		if (rd->als_enabled)
-			reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
-		else
-			as3676_als_set_adc_ctrl(rd);
-	}
-}
-
 static void as3676_set_brightness(struct as3676_record *rd,
 		enum as3676_register reg, enum led_brightness value, int flags)
 {
@@ -759,14 +643,6 @@ static void as3676_set_brightness(struct as3676_record *rd,
 		ctrl_val |= (AS3676_CTRL_ON << off_bits);
 	reg_set(rd, ctrl_reg, ctrl_val);
 
-	if ((as3676_sink[reg].flags & AS3676_FLAG_EXT_CURR) &&
-		(flags & AS3676_FLAG_AUDIO)) {
-		if (value == LED_OFF)
-			as3676_audio_set_config(rd, 0);
-		else
-			as3676_audio_set_config(rd, 1);
-	}
-
 	if (as3676_sink[reg].flags & AS3676_FLAG_DCDC_CTRL) {
 		u8 ctrl_val = reg_get(rd, AS3676_REG_CTRL);
 		u64 dcdcbit = rd->dcdcbit;
@@ -794,26 +670,19 @@ static void as3676_set_interface_brightness(struct as3676_interface *intf,
 	int i;
 	enum as3676_cmode cmode;
 	struct as3676_record *rd;
-	struct as3676_platform_data *pdata;
 	rd = container_of(intf, struct as3676_record, interfaces[intf->index]);
-	pdata = rd->client->dev.platform_data;
 
 	cmode = rd->cmode;
 	rd->cmode = AS3676_CMODE_IMMEDIATE;
 
 	intf->cdev.brightness = value;
 
-	if (rd->audio_enabled || (rd->als_suspend == AS3676_NO_SUSPEND) ||
-		!(pdata->leds[intf->index].flags & AS3676_FLAG_WAIT_RESUME)) {
-		if (intf->max_current)
-			value = (value * intf->max_current)
-							/ AS3676_MAX_CURRENT;
+	if (intf->max_current)
+		value = (value * intf->max_current) / AS3676_MAX_CURRENT;
 
-		for (i = 0; i < ARRAY_SIZE(as3676_sink); ++i) {
-			if (intf->regs & ((u64)1 << i))
-				as3676_set_brightness(rd, i,
-							value, intf->flags);
-		}
+	for (i = 0; i < ARRAY_SIZE(as3676_sink); ++i) {
+		if (intf->regs & ((u64)1 << i))
+			as3676_set_brightness(rd, i, value, intf->flags);
 	}
 	rd->cmode = cmode;
 }
@@ -1021,72 +890,19 @@ static ssize_t as3676_als_value_show(struct kobject *kobj,
 static void as3676_als_set_adc_ctrl(struct as3676_record *rd)
 {
 	u8 val;
-	int status;
+
 	/* Sometimes AS3676 has increased 200uA current consumption in standby
 	 * and need to handle it by sw. */
 	reg_set(rd, AS3676_ADC_CTRL, 0x80);
-	status = i2c_smbus_read_i2c_block_data(rd->client, AS3676_ADC_CTRL,
-					       1, &val);
-	if (status < 0)
-		dev_err(&rd->client->dev, "%s:I2C read error:%d\n",
-			 __func__, status);
+	i2c_smbus_read_i2c_block_data(rd->client, AS3676_ADC_CTRL, 1, &val);
 }
 
-static void as3676_als_set_enable(struct as3676_record *rd,
-		struct as3676_interface *intf, u8 enable)
+static void as3676_als_set_enable(struct as3676_record *rd, u8 enable)
 {
-	as3676_als_set_enable_internal(rd, enable);
-
-	rd->als_enabled = enable;
-
-	/* We have to make sure to turn on/off the ALS curve here,
-	 * or the brightness will still be limited by the last ALS
-	 * reading (if you go from on to off).
-	 */
-
-	if (enable) {
-		enum as3676_amb_value group;
-
-		switch (intf->flags & AS3676_FLAG_ALS_MASK) {
-		case AS3676_FLAG_ALS_GROUP1:
-			group = AS3676_AMB_GROUP_1;
-			break;
-		case AS3676_FLAG_ALS_GROUP2:
-			group = AS3676_AMB_GROUP_2;
-			break;
-		case AS3676_FLAG_ALS_GROUP3:
-			group = AS3676_AMB_GROUP_3;
-			break;
-		default:
-			group = AS3676_AMB_OFF;
-			break;
-		}
-		as3676_set_interface_amb(rd, intf, group);
-	} else {
-		/* Turn off the curve */
-		as3676_set_interface_amb(rd, intf, AS3676_AMB_OFF);
-	}
-
-	/* Make it happen! */
-	schedule_work(&rd->work);
-}
-
-static void as3676_als_set_enable_internal(struct as3676_record *rd, u8 enable)
-{
-	if (enable && !rd->audio_enabled)
+	if (enable)
 		reg_set(rd, AS3676_AMB_CTRL, (rd->als.gain << 1) | 0x01);
 	else
 		reg_set(rd, AS3676_AMB_CTRL, 0x00);
-
-	if (!rd->audio_enabled && rd->als_suspend == AS3676_SUSPENDED) {
-		/*
-		 *  as3676 keeps old ALS value during sleep in amb_result
-		 *  register and it affects the brightness soon after wakeup.
-		 *  Need 2ms wait to update value.
-		 */
-		schedule_delayed_work(&rd->als_enabled_work,
-				msecs_to_jiffies(AS3676_ALS_ENABLE_WAIT_MS));
-	}
 }
 
 static ssize_t as3676_als_enable_store(struct kobject *kobj,
@@ -1109,12 +925,11 @@ static ssize_t as3676_als_enable_store(struct kobject *kobj,
 	val = reg_get(rd, AS3676_AMB_CTRL) & 0x01;
 
 	if (enable != val) {
-		as3676_als_set_enable(rd, intf, enable);
+		as3676_als_set_enable(rd, enable);
 
 		if (enable) {
 			as3676_als_set_params(rd, &rd->als);
-			if (!rd->audio_enabled)
-				reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
+			reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
 		} else {
 			struct as3676_als_config param;
 
@@ -1433,17 +1248,6 @@ static int as3676_create_als_tree(struct as3676_record *rd,
 	return rc;
 }
 
-static void as3676_restore(struct as3676_record *rd)
-{
-	unsigned i;
-	u8 reg;
-
-	for (i = 0; i < ARRAY_SIZE(as3676_restore_regs); i++) {
-		reg = as3676_restore_regs[i];
-		reg_set(rd, reg, rd->registers[reg]);
-	}
-}
-
 #if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND)
 static int as3676_pm_suspend(struct device *dev)
 {
@@ -1457,10 +1261,8 @@ static int as3676_pm_suspend(struct device *dev)
 	reg_set(rd, AS3676_REG_CTRL, 0x00);
 
 	if (rd->als_connected) {
-		as3676_als_set_enable_internal(rd, 0);
-		if (!rd->audio_enabled)
-			as3676_als_set_adc_ctrl(rd);
-		rd->als_suspend = AS3676_SUSPENDED;
+		as3676_als_set_enable(rd, 0);
+		as3676_als_set_adc_ctrl(rd);
 	}
 
 	as3676_unlock(rd);
@@ -1476,17 +1278,15 @@ static int as3676_pm_resume(struct device *dev)
 	dev_info(dev, "Resuming AS3676\n");
 
 	as3676_lock(rd);
-	as3676_restore(rd);
 	reg_set(rd, AS3676_REG_CTRL, 0x0d);
 
 	if (rd->als_connected) {
 		if (rd->als_wait) {
-			schedule_delayed_work(&rd->als_resume_work,
+			schedule_delayed_work(&rd->delayed_work,
 					msecs_to_jiffies(rd->als_wait));
 		} else {
-			as3676_als_set_enable_internal(rd, rd->als_enabled);
-			if (!rd->audio_enabled)
-				reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
+			as3676_als_set_enable(rd, 1);
+			reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
 		}
 	}
 	rd->cmode = AS3676_CMODE_SCHEDULED;
@@ -1513,10 +1313,8 @@ static void as3676_early_suspend(struct early_suspend *handler)
 	reg_set(rd, AS3676_REG_CTRL, 0x00);
 
 	if (rd->als_connected) {
-		as3676_als_set_enable_internal(rd, 0);
-		if (!rd->audio_enabled)
-			as3676_als_set_adc_ctrl(rd);
-		rd->als_suspend = AS3676_SUSPENDED;
+		as3676_als_set_enable(rd, 0);
+		as3676_als_set_adc_ctrl(rd);
 	}
 
 	as3676_unlock(rd);
@@ -1530,17 +1328,15 @@ static void as3676_late_resume(struct early_suspend *handler)
 	dev_info(&rd->client->dev, "%s\n", __func__);
 
 	as3676_lock(rd);
-	as3676_restore(rd);
 	reg_set(rd, AS3676_REG_CTRL, 0x0d);
 
 	if (rd->als_connected) {
 		if (rd->als_wait) {
-			schedule_delayed_work(&rd->als_resume_work,
+			schedule_delayed_work(&rd->delayed_work,
 					msecs_to_jiffies(rd->als_wait));
 		} else {
-			as3676_als_set_enable_internal(rd, rd->als_enabled);
-			if (!rd->audio_enabled)
-				reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
+			as3676_als_set_enable(rd, 1);
+			reg_set(rd, AS3676_ADC_CTRL, rd->als.source);
 		}
 	}
 
@@ -1591,8 +1387,7 @@ static int __devexit as3676_remove(struct i2c_client *client)
 	unregister_early_suspend(&rd->early_suspend);
 #endif
 
-	cancel_delayed_work_sync(&rd->als_resume_work);
-	cancel_delayed_work_sync(&rd->als_enabled_work);
+	cancel_delayed_work_sync(&rd->delayed_work);
 	rd->cmode = AS3676_CMODE_IMMEDIATE;
 	reg_set(rd, AS3676_REG_CTRL, 0x00);
 
@@ -1663,8 +1458,7 @@ static int __devinit as3676_probe(struct i2c_client *client,
 
 	mutex_init(&rd->lock);
 	INIT_WORK(&rd->work, as3676_worker);
-	INIT_DELAYED_WORK(&rd->als_resume_work, as3676_als_resume_worker);
-	INIT_DELAYED_WORK(&rd->als_enabled_work, as3676_als_enabled_worker);
+	INIT_DELAYED_WORK(&rd->delayed_work, as3676_als_delayed_worker);
 
 	/* We will need the i2c device later */
 	rd->client = client;
@@ -1738,7 +1532,7 @@ static int __devinit as3676_probe(struct i2c_client *client,
 	reg_set(rd, AS3676_MODE_SWITCH, 0x70);
 	/* Allow dimming up */
 	reg_set(rd, AS3676_REG_PWM_CODE, 0);
-	reg_set(rd, AS3676_REG_PWM_CTRL, 4<<3 | 1<<1);
+	reg_set(rd, AS3676_REG_PWM_CTRL, 0<<3 | 1<<1);
 
 	if (pdata->als_config) {
 		memcpy(&rd->als, pdata->als_config,
@@ -1748,20 +1542,9 @@ static int __devinit as3676_probe(struct i2c_client *client,
 				sizeof(struct as3676_als_config));
 	}
 
-	if (pdata->audio_config) {
-		memcpy(&rd->audio, pdata->audio_config,
-				sizeof(struct as3676_audio_config));
-	} else {
-		memset(&rd->audio, 0,
-				sizeof(struct as3676_audio_config));
-	}
-
 	if (rd->als_connected) {
 		as3676_als_set_params(rd, &rd->als);
-		/* By default, ALS should be enabled */
-		rd->als_enabled = 1;
-		as3676_als_set_enable_internal(rd, rd->als_enabled);
-		rd->als_suspend = AS3676_NO_SUSPEND;
+		as3676_als_set_enable(rd, 1);
 	}
 
 	if (rd->dls_connected)

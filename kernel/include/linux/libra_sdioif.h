@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -40,7 +40,7 @@
 
 #define LIBRA_MAN_ID              0x70
 
-typedef int (suspend_handler_t)(struct sdio_func *);
+typedef void (suspend_handler_t)(struct sdio_func *);
 typedef void (resume_handler_t)(struct sdio_func *);
 
 int    libra_sdio_configure(sdio_irq_handler_t libra_sdio_rxhandler,
@@ -73,11 +73,5 @@ int libra_sdio_configure_suspend_resume(
 		suspend_handler_t *libra_sdio_suspend_hdlr,
 		resume_handler_t *libra_sdio_resume_hdlr);
 
-int libra_detect_card_change(void);
-
-void libra_sdio_release_irq(struct sdio_func *func);
-int libra_enable_sdio_irq(struct sdio_func *func, u8 enable);
-void libra_sdio_disable_func(struct sdio_func *func);
-void libra_sdio_set_clock(struct sdio_func *func, unsigned int clk_freq);
 
 #endif /* __LIBRA_SDIOIF_H__ */

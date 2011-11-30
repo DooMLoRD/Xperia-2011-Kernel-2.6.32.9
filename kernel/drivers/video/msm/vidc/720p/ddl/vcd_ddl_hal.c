@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -739,8 +739,8 @@ void ddl_encode_frame_run(struct ddl_client_context *ddl)
 
 	y_addr = (u32) ddl->input_frame.vcd_frm.physical +
 	    ddl->input_frame.vcd_frm.offset;
-	c_addr = (y_addr + (encoder->frame_size.scan_lines *
-				encoder->frame_size.stride));
+	c_addr = (y_addr + (encoder->frame_size.height *
+				encoder->frame_size.width));
 	ddl_move_client_state(ddl, DDL_CLIENT_WAIT_FOR_FRAME_DONE);
 	ddl_move_command_state(ddl->ddl_context, DDL_CMD_ENCODE_FRAME);
 

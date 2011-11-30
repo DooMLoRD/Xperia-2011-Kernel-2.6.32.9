@@ -2,7 +2,7 @@
  * Register/Interrupt access for userspace aDSP library.
  *
  * Copyright (C) 2008 Google, Inc.
- * Copyright (c) 2008-2009,2011 Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
  * Author: Iliyan Malchev <ibm@android.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -931,7 +931,7 @@ static int msm_adsp_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	adsp_info.raw_event = kzalloc(
-		(sizeof(struct adsp_rtos_mp_mtoa_s_type)), GFP_KERNEL);
+		(sizeof(struct adsp_rtos_mp_mtoa_init_info_type)), GFP_KERNEL);
 	if (!adsp_info.raw_event) {
 		kfree(adsp_info.init_info_ptr);
 		return -ENOMEM;

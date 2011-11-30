@@ -46,4 +46,3 @@ obj-$(CONFIG_INPUT_AK8975)		+= ak8975.o
 obj-$(CONFIG_INPUT_APDS9702)	+= apds9702.o
 obj-$(CONFIG_INPUT_SIMPLE_REMOTE)	+= simple_remote.o
 obj-$(CONFIG_INPUT_BMA250)		+= bma250.o
-obj-$(CONFIG_INPUT_BMP180)		+= bmp180.o

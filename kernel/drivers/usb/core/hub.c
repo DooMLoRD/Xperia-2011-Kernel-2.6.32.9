@@ -1730,8 +1730,7 @@ out:
 			msecs_to_jiffies(THOST_REQ_POLL));
 	}
 #ifdef CONFIG_USB_OTG_NOTIFICATION
-	else if (udev->config &&
-			udev->config->desc.bMaxPower * 2 > udev->bus_mA) {
+	else if (udev->config->desc.bMaxPower * 2 > udev->bus_mA) {
 		dev_dbg(&udev->dev, "Exceeds power limit\n");
 		snprintf(udev->otg_dev_info, sizeof(udev->otg_dev_info),
 				"OTG_DEVICE_OVER_CURRENT");
@@ -2806,22 +2805,14 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 					buf->bMaxPacketSize0;
 			kfree(buf);
 
-			/*
-			 * If it is a HSET Test device, we don't issue a
-			 * second reset which results in failure due to
-			 * speed change.
-			 */
-			if (le16_to_cpu(buf->idVendor) != 0x1a0a) {
-				retval = hub_port_reset(hub, port1, udev,
-							 delay);
-				if (retval < 0)	/* error or disconnect */
-					goto fail;
-				if (oldspeed != udev->speed) {
-					dev_dbg(&udev->dev,
-					       "device reset changed speed!\n");
-					retval = -ENODEV;
-					goto fail;
-				}
+			retval = hub_port_reset(hub, port1, udev, delay);
+			if (retval < 0)		/* error or disconnect */
+				goto fail;
+			if (oldspeed != udev->speed) {
+				dev_dbg(&udev->dev,
+					"device reset changed speed!\n");
+				retval = -ENODEV;
+				goto fail;
 			}
 			if (r) {
 				dev_err(&udev->dev,

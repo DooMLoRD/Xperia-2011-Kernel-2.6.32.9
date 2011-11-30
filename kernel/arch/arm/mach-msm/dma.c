@@ -721,6 +721,21 @@ static void config_datamover(int adm)
 #endif
 }
 
+void msm_dmov_reset(int adm)
+{
+	int i, ch;
+	unsigned int int_status;
+
+	/* read and clear ADM interrupt */
+	int_status = readl(DMOV_REG(DMOV_ISR, adm));
+	/* read the results and clean fifo */
+	for (ch = 0; ch < MSM_DMOV_CHANNEL_COUNT; ch++) {
+		for (i = 0; i < 3; i++) {
+			(void)readl(DMOV_REG(DMOV_RSLT(ch), adm));
+		}
+	}
+}
+
 /* static int __init */
 static int __init msm_init_datamover(void)
 {
@@ -728,6 +743,9 @@ static int __init msm_init_datamover(void)
 	int j;
 	int ret;
 	for (j = 0; j < ARRAY_SIZE(dmov_conf); j++) {
+		/* If we are in KDUMP kernel */
+		if (reset_devices)
+			msm_dmov_reset(j);
 
 		config_datamover(j);
 		for (i = 0; i < MSM_DMOV_CHANNEL_COUNT; i++) {

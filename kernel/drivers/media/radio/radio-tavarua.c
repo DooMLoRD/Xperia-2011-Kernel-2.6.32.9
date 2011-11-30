@@ -2149,12 +2149,6 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 					FMDERR("Error in tavarua_set_audio_path"
 						" %d\n", retval);
 				}
-			 /* Enabling 'SoftMute' and 'SignalBlending' features */
-			value = (radio->registers[IOCTRL] |
-				    IOC_SFT_MUTE | IOC_SIG_BLND);
-			retval = tavarua_write_register(radio, IOCTRL, value);
-			if (retval < 0)
-				FMDBG("SMute and SBlending not enabled\n");
 			}
 		}
 		/* check if off */

@@ -29,6 +29,9 @@
 #include <linux/io.h>
 #include <linux/termios.h>
 #include <linux/ctype.h>
+#ifdef CONFIG_KEXEC
+#include <linux/debug_locks.h>
+#endif
 #include <mach/msm_smd.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
@@ -201,8 +204,15 @@ void smd_diag(void)
 
 static void handle_modem_crash(void)
 {
+#ifdef CONFIG_KEXEC
+	console_verbose();
+#endif
 	pr_err("ARM9 has CRASHED\n");
 	smd_diag();
+#ifdef CONFIG_KEXEC
+	debug_locks_off();
+	panic("Modem has crashed...\n");
+#endif
 
 	/* hard reboot if possible FIXME
 	if (msm_reset_hook)
@@ -1366,6 +1376,9 @@ static irqreturn_t smsm_irq_handler(int irq, void *data)
 
 		} else if (modm & SMSM_RESET) {
 			apps |= SMSM_RESET;
+#ifdef CONFIG_KEXEC
+			handle_modem_crash();
+#endif
 		} else if (modm & SMSM_INIT) {
 			if (!(apps & SMSM_INIT)) {
 				apps |= SMSM_INIT;
@@ -1607,3 +1620,37 @@ module_init(msm_smd_init);
 MODULE_DESCRIPTION("MSM Shared Memory Core");
 MODULE_AUTHOR("Brian Swetland <swetland@google.com>");
 MODULE_LICENSE("GPL");
+
+#ifdef CONFIG_KEXEC
+void smsm_notify_apps_crashdump(void)
+{
+	uint32_t *smsm;
+	unsigned long flags;
+	uint32_t old_state;
+
+	if (!spin_is_locked(&smem_lock)) {
+		spin_lock_irqsave(&smem_lock, flags);
+		smsm = smem_alloc(ID_SHARED_STATE,
+				SMSM_NUM_ENTRIES * sizeof(uint32_t));
+		if (smsm != NULL) {
+			old_state = smsm[SMSM_APPS_STATE];
+			smsm[SMSM_APPS_STATE] |= SMSM_APPS_CRASHDUMP;
+			notify_other_smsm(SMSM_APPS_STATE,
+				(old_state ^ smsm[SMSM_APPS_STATE]));
+		}
+		spin_unlock_irqrestore(&smem_lock, flags);
+	} else {
+		smsm = smem_alloc(ID_SHARED_STATE,
+				SMSM_NUM_ENTRIES * sizeof(uint32_t));
+		if (smsm != NULL) {
+			old_state = smsm[SMSM_APPS_STATE];
+			smsm[SMSM_APPS_STATE] |= SMSM_APPS_CRASHDUMP;
+			notify_other_smsm(SMSM_APPS_STATE,
+				(old_state ^ smsm[SMSM_APPS_STATE]));
+		}
+	}
+
+	return;
+}
+#endif
+

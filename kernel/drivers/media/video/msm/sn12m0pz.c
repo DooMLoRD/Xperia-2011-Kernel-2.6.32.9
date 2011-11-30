@@ -492,7 +492,7 @@ static int32_t sn12m0pz_stmipid02_config(void)
 		return rc; /* CSI Mode on Data Lane 1.1 (DATA1P1, DATA1N1) */
 
 	/* Tristated Output, continuous clock, */
-	if (sn12m0pz_i2c_write_byte_bridge(0x28>>1, 0x0015, 0x08) < 0)
+	if (sn12m0pz_i2c_write_byte_bridge(0x28>>1, 0x0015, 0x00) < 0)
 		return rc; /*polarity of clock and sync signals not inverted*/
 	if (sn12m0pz_i2c_write_byte_bridge(0x28>>1, 0x0036, 0x20) < 0)
 		return rc; /* Enable compensation macro, main camera */

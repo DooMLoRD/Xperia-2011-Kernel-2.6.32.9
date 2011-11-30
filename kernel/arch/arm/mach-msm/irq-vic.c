@@ -235,25 +235,6 @@ static void msm_irq_ack(unsigned int irq)
 	writel(irq, reg);
 }
 
-static void msm_irq_disable(unsigned int irq)
-{
-	void __iomem *reg = VIC_INT_TO_REG_ADDR(VIC_INT_ENCLEAR0, irq);
-	unsigned index = VIC_INT_TO_REG_INDEX(irq);
-	uint32_t mask = 1UL << (irq & 31);
-	int smsm_irq = msm_irq_to_smsm[irq];
-
-	if (!(msm_irq_shadow_reg[index].int_en[1] & mask)) {
-		msm_irq_shadow_reg[index].int_en[0] &= ~mask;
-		writel(mask, reg);
-		if (smsm_irq == 0)
-			msm_irq_idle_disable[index] &= ~mask;
-		else {
-			mask = 1UL << (smsm_irq - 1);
-			msm_irq_smsm_wake_enable[0] &= ~mask;
-		}
-	}
-}
-
 static void msm_irq_mask(unsigned int irq)
 {
 	void __iomem *reg = VIC_INT_TO_REG_ADDR(VIC_INT_ENCLEAR0, irq);
@@ -538,9 +519,33 @@ void msm_irq_exit_sleep3(uint32_t irq_mask, uint32_t wakeup_reason,
 			smsm_get_state(SMSM_MODEM_STATE));
 }
 
+/*
+ * In case booting the KDUMP Capture Kernel,
+ * Get the IRQ Chip to a stable state before
+ * initializing
+ */
+void reset_msm_irq(void)
+{
+	int limit = 10;
+
+	writel(0x00000000, VIC_INT_MASTEREN);
+	writel(0xFFFFFFFF, VIC_INT_ENCLEAR0);
+	writel(0xFFFFFFFF, VIC_INT_ENCLEAR1);
+	writel(0xFFFFFFFF, VIC_INT_ENCLEAR2);
+	writel(0xFFFFFFFF, VIC_INT_ENCLEAR3);
+	writel(0xFFFFFFFF, VIC_INT_CLEAR0);
+	writel(0xFFFFFFFF, VIC_INT_CLEAR1);
+	writel(0xFFFFFFFF, VIC_INT_CLEAR2);
+	writel(0xFFFFFFFF, VIC_INT_CLEAR3);
+	while (limit-- > 0) {
+		(void)readl(VIC_IRQ_VEC_RD);
+		(void)readl(VIC_IRQ_VEC_PEND_RD);
+	}
+}
+
 static struct irq_chip msm_irq_chip = {
 	.name      = "msm",
-	.disable   = msm_irq_disable,
+	.disable   = msm_irq_mask,
 	.ack       = msm_irq_ack,
 	.mask      = msm_irq_mask,
 	.unmask    = msm_irq_unmask,
@@ -551,6 +556,10 @@ static struct irq_chip msm_irq_chip = {
 void __init msm_init_irq(void)
 {
 	unsigned n;
+
+	/* If we are in KDUMP Kernel*/
+	if (reset_devices)
+		reset_msm_irq();
 
 	/* select level interrupts */
 	msm_irq_write_all_regs(VIC_INT_TYPE0, 0);

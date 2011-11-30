@@ -1,6 +1,6 @@
 /* /kernel/arch/arm/mach-msm/charger-anzu.c
  *
- * Copyright (C) 2010 Sony Ericsson Mobile Communications AB.
+ * Copyright (C) [2010] Sony Ericsson Mobile Communications AB.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2, as
@@ -15,8 +15,8 @@ static struct ambient_temperature_limit limit_tbl = {
 	{4,	1,	37,	0},	/* ambient temp: hysteresis */
 };
 
-struct device_data device_data = {
+struct ambient_temperature_data battery_chargalg_platform_ambient_temp = {
 	.limit_tbl = &limit_tbl,
-	.battery_capacity_mah = 1500,
-	.maximum_charging_current_ma = 1050,
 };
+
+const u16 battery_capacity_mah = 1500;

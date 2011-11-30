@@ -42,7 +42,6 @@
 #include <linux/leds-pmic8058.h>
 #include <linux/input/cy8c_ts.h>
 #include <linux/msm_adc.h>
-#include <linux/dma-mapping.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -2414,8 +2413,8 @@ static char *usb_functions_rndis_diag[] = {
 
 static char *usb_functions_rndis_adb_diag[] = {
 	"rndis",
-	"diag",
 	"adb",
+	"diag",
 };
 
 static char *usb_functions_all[] = {
@@ -3578,81 +3577,6 @@ static struct platform_device msm_device_kgsl = {
 	},
 };
 
-#if defined(CONFIG_CRYPTO_DEV_QCRYPTO) || \
-		defined(CONFIG_CRYPTO_DEV_QCRYPTO_MODULE) || \
-		defined(CONFIG_CRYPTO_DEV_QCEDEV) || \
-		defined(CONFIG_CRYPTO_DEV_QCEDEV_MODULE)
-
-#define QCE_SIZE		0x10000
-#define QCE_0_BASE		0xA8400000
-
-#define ADM_CHANNEL_CE_0_IN	DMOV_CE_CHAN_IN
-#define ADM_CHANNEL_CE_0_OUT	DMOV_CE_CHAN_OUT
-
-#define ADM_CRCI_0_IN		DMOV_CE_CRCI_IN
-#define ADM_CRCI_0_OUT		DMOV_CE_CRCI_OUT
-#define ADM_CRCI_0_HASH		DMOV_CE_CRCI_HASH
-
-static struct resource qce_resources[] = {
-	[0] = {
-		.start = QCE_0_BASE,
-		.end = QCE_0_BASE + QCE_SIZE - 1,
-		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
-		.name = "crypto_channels",
-		.start = ADM_CHANNEL_CE_0_IN,
-		.end = ADM_CHANNEL_CE_0_OUT,
-		.flags = IORESOURCE_DMA,
-	},
-	[2] = {
-		.name = "crypto_crci_in",
-		.start = ADM_CRCI_0_IN,
-		.end = ADM_CRCI_0_IN,
-		.flags = IORESOURCE_DMA,
-	},
-	[3] = {
-		.name = "crypto_crci_out",
-		.start = ADM_CRCI_0_OUT,
-		.end = ADM_CRCI_0_OUT,
-		.flags = IORESOURCE_DMA,
-	},
-	[4] = {
-		.name = "crypto_crci_hash",
-		.start = ADM_CRCI_0_HASH,
-		.end = ADM_CRCI_0_HASH,
-		.flags = IORESOURCE_DMA,
-	},
-};
-
-#endif
-
-#if defined(CONFIG_CRYPTO_DEV_QCRYPTO) || \
-		defined(CONFIG_CRYPTO_DEV_QCRYPTO_MODULE)
-static struct platform_device qcrypto_device = {
-	.name		= "qcrypto",
-	.id		= 0,
-	.num_resources	= ARRAY_SIZE(qce_resources),
-	.resource	= qce_resources,
-	.dev		= {
-		.coherent_dma_mask = DMA_BIT_MASK(32),
-	},
-};
-#endif
-
-#if defined(CONFIG_CRYPTO_DEV_QCEDEV) || \
-		defined(CONFIG_CRYPTO_DEV_QCEDEV_MODULE)
-static struct platform_device qcedev_device = {
-	.name		= "qce",
-	.id		= 0,
-	.num_resources	= ARRAY_SIZE(qce_resources),
-	.resource	= qce_resources,
-	.dev		= {
-		.coherent_dma_mask = DMA_BIT_MASK(32),
-	},
-};
-#endif
-
 static int mddi_toshiba_pmic_bl(int level)
 {
 	int ret = -EPERM;
@@ -4030,18 +3954,10 @@ static struct mddi_platform_data mddi_pdata = {
 	.mddi_client_power = msm_fb_mddi_client_power,
 };
 
-int mdp_core_clk_rate_table[] = {
-	122880000,
-	122880000,
-	122880000,
-	192000000,
-};
 static struct msm_panel_common_pdata mdp_pdata = {
 	.hw_revision_addr = 0xac001270,
 	.gpio = 30,
 	.mdp_core_clk_rate = 122880000,
-	.mdp_core_clk_table = mdp_core_clk_rate_table,
-	.num_mdp_clk = ARRAY_SIZE(mdp_core_clk_rate_table),
 };
 
 static int lcd_panel_spi_gpio_num[] = {
@@ -4716,17 +4632,6 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_MSM_SDIO_AL
 	&msm_device_sdio_al,
 #endif
-
-#if defined(CONFIG_CRYPTO_DEV_QCRYPTO) || \
-		defined(CONFIG_CRYPTO_DEV_QCRYPTO_MODULE)
-	&qcrypto_device,
-#endif
-
-#if defined(CONFIG_CRYPTO_DEV_QCEDEV) || \
-		defined(CONFIG_CRYPTO_DEV_QCEDEV_MODULE)
-	&qcedev_device,
-#endif
-
 	&msm_batt_device,
 	&msm_adc_device,
 };

@@ -24,13 +24,11 @@
 
 #ifdef DEBUG
 #define MUTEX_LOCK(x) do {						\
-	struct data_info *d = container_of(x, struct data_info, lock);	\
-	dev_dbg(d->dev, "Locking mutex in %s\n", __func__);		\
+	pr_debug("%s: Locking mutex in %s\n", SEMC_BDATA_NAME, __func__);\
 	mutex_lock(x);							\
 } while (0)
 #define MUTEX_UNLOCK(x) do {						\
-	struct data_info *d = container_of(x, struct data_info, lock);	\
-	dev_dbg(d->dev, "Unlocking mutex in %s\n", __func__);		\
+	pr_debug("%s: Unlocking mutex in %s\n", SEMC_BDATA_NAME, __func__);\
 	mutex_unlock(x);						\
 } while (0)
 #else
@@ -70,13 +68,13 @@ struct battery_data {
 struct notify_platform {
 	u8 charging; /* 0 -> no, 1 -> yes */
 	u8 battery_full;
+	u8 power_collapse;
 	u16 battery_charge_current;
 	u16 charger_charge_current;
 };
 
 struct data_info {
 	struct power_supply bdata_ps;
-	struct device *dev;
 	struct battery_data bdata;
 	struct notify_platform notify;
 	u8 battery_ovp;
@@ -91,11 +89,7 @@ struct data_info {
 	struct msm_rpc_client *rpc_client;
 	struct mutex lock;
 
-#ifdef CONFIG_SEMC_BATTERY_SHOW_HEALTH
-	int health;
-#else
-	int (*set_battery_health)(int health);
-#endif
+	void (*set_battery_health)(int health);
 
 #ifdef DEBUG_FS
 	struct override_value temperature_debug;
@@ -105,18 +99,12 @@ struct data_info {
 };
 
 static enum power_supply_property batt_props[] = {
-#ifdef CONFIG_SEMC_BATTERY_SHOW_HEALTH
-	POWER_SUPPLY_PROP_HEALTH,
-#endif
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_TEMP,
 	POWER_SUPPLY_PROP_TEMP_AMBIENT,
 };
 
 static enum power_supply_property batt_props_with_fg[] = {
-#ifdef CONFIG_SEMC_BATTERY_SHOW_HEALTH
-	POWER_SUPPLY_PROP_HEALTH,
-#endif
 	POWER_SUPPLY_PROP_TECHNOLOGY,
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_TEMP,
@@ -164,7 +152,7 @@ static int semc_battery_create_attrs(struct device *dev)
 	return 0;
 
 semc_create_attrs_failed:
-	dev_err(dev, "Failed creating semc battery attrs.\n");
+	pr_err("%s: Failed creating semc battery attrs.\n", SEMC_BDATA_NAME);
 	while (i--)
 		device_remove_file(dev, &semc_battery_attrs[i]);
 
@@ -260,8 +248,9 @@ static ssize_t store_temperature(struct device *pdev,
 
 		power_supply_changed(&di->bdata_ps);
 	} else {
-		dev_err(pdev, "Wrong input to sysfs set_temperature. "
-			"Expect [-21..100]. -21 releases the debug value\n");
+		pr_err("%s: Wrong input to sysfs set_temperature. "
+		       "Expect [-21..100]. -21 releases the debug value\n",
+		       SEMC_BDATA_NAME);
 		rc = -EINVAL;
 	}
 
@@ -294,9 +283,8 @@ static ssize_t store_technology(struct device *pdev,
 
 		power_supply_changed(&di->bdata_ps);
 	} else {
-		dev_err(pdev,
-			"Wrong input to sysfs set_technology. Expect [-1..2]. "
-			"-1 releases the debug value\n");
+		pr_err("%s: Wrong input to sysfs set_technology. Expect [-1..2]"
+		       ". -1 releases the debug value\n", SEMC_BDATA_NAME);
 		rc = -EINVAL;
 	}
 
@@ -328,8 +316,9 @@ static ssize_t store_temperature_ambient(struct device *pdev,
 
 		power_supply_changed(&di->bdata_ps);
 	} else {
-		dev_err(pdev, "Wrong input to sysfs set_temperature_ambient. "
-			"Expect [-21..100]. -21 releases the debug value\n");
+		pr_err("%s: Wrong input to sysfs set_temperature_ambient. "
+		       "Expect [-21..100]. -21 releases the debug value\n",
+		       SEMC_BDATA_NAME);
 		rc = -EINVAL;
 	}
 
@@ -344,17 +333,10 @@ static int cutoff_level_cb(
 	if (arg && OEM_RAPI_SERVER_EVENT_CUTOFF_CB_EVENT == arg->event) {
 		struct data_info *di = arg->handle;
 
-		dev_dbg(di->dev, "%s\n", __func__);
+		pr_debug("%s: %s\n", SEMC_BDATA_NAME, __func__);
 
-#ifdef CONFIG_SEMC_BATTERY_SHOW_HEALTH
-		MUTEX_LOCK(&di->lock);
-		di->health = POWER_SUPPLY_HEALTH_DEAD;
-		MUTEX_UNLOCK(&di->lock);
-		power_supply_changed(&di->bdata_ps);
-#else
 		if (di && di->set_battery_health)
-			(void)di->set_battery_health(POWER_SUPPLY_HEALTH_DEAD);
-#endif /* CONFIG_SEMC_BATTERY_SHOW_HEALTH */
+			di->set_battery_health(POWER_SUPPLY_HEALTH_DEAD);
 	}
 
 	return 0;
@@ -364,27 +346,23 @@ static int bdata_change_cb(
 	struct oem_rapi_client_streaming_func_cb_arg *arg,
 	struct oem_rapi_client_streaming_func_cb_ret *ret)
 {
-	int rc = 0;
-
 	if (arg && OEM_RAPI_SERVER_EVENT_NOTIFY_BDATA_CB_EVENT == arg->event &&
 	    sizeof(struct battery_data) == arg->in_len) {
 		struct data_info *di = arg->handle;
 
-		if (di) {
-			dev_dbg(di->dev, "%s\n", __func__);
+		pr_debug("%s: %s\n", SEMC_BDATA_NAME, __func__);
 
+		if (di) {
 			MUTEX_LOCK(&di->lock);
 			di->bdata = *(struct battery_data *)arg->input;
 			MUTEX_UNLOCK(&di->lock);
 			power_supply_changed(&di->bdata_ps);
-
-			dev_dbg(di->dev, "%s return\n", __func__);
-		} else {
-			rc = -EINVAL;
 		}
+
+		pr_debug("%s: %s return\n", SEMC_BDATA_NAME, __func__);
 	}
 
-	return rc;
+	return 0;
 }
 
 static int set_platform_callbacks(struct data_info *di)
@@ -417,8 +395,8 @@ static int set_platform_callbacks(struct data_info *di)
 						&client_arg,
 						&client_ret);
 	if (rc) {
-		dev_err(di->dev, "Failed register cutoff level. Error %d\n",
-			rc);
+		pr_err("%s: Failed register cutoff level. Error %d\n",
+		       SEMC_BDATA_NAME, rc);
 		goto set_callbacks_exit;
 	}
 
@@ -430,8 +408,8 @@ static int set_platform_callbacks(struct data_info *di)
 						&client_arg,
 						&client_ret);
 	if (rc)
-		dev_err(di->dev, "Failed register bdata change. Error %d\n",
-			rc);
+		pr_err("%s: Failed register bdata change. Error %d\n",
+		       SEMC_BDATA_NAME, rc);
 
 set_callbacks_exit:
 	return rc;
@@ -465,8 +443,8 @@ static void clear_platform_callbacks(struct data_info *di)
 						&client_arg,
 						&client_ret);
 	if (rc)
-		dev_err(di->dev, "Failed unregister cutoff level. Error %d\n",
-			rc);
+		pr_err("%s: Failed unregister cutoff level. Error %d\n",
+		       SEMC_BDATA_NAME, rc);
 
 	/* Clear battery data change callback */
 	client_arg.event =
@@ -475,8 +453,8 @@ static void clear_platform_callbacks(struct data_info *di)
 						&client_arg,
 						&client_ret);
 	if (rc)
-		dev_err(di->dev, "Failed unregister bdata change. Error %d\n",
-			rc);
+		pr_err("%s Failed unregister bdata change. Error %d\n",
+		       SEMC_BDATA_NAME, rc);
 }
 
 static inline int get_technology(enum battery_technology tech)
@@ -509,11 +487,6 @@ static int bdata_get_property(struct power_supply *psy,
 	MUTEX_LOCK(&di->lock);
 
 	switch (psp) {
-#ifdef CONFIG_SEMC_BATTERY_SHOW_HEALTH
-	case POWER_SUPPLY_PROP_HEALTH:
-		val->intval = di->health;
-		break;
-#endif
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
 	{
 		enum battery_technology tech = di->bdata.technology;
@@ -584,8 +557,8 @@ static int msm_get_event(struct data_info *di, u32 event, u8 event_switch,
 						&client_arg,
 						&client_ret);
 	if (rc < 0) {
-		dev_err(di->dev, "Failed getting event '%d'. Error %d\n",
-			event, rc);
+		pr_err("%s: Failed getting event '%d'. Error %d\n",
+		       SEMC_BDATA_NAME, event, rc);
 	} else if (client_ret.out_len == NULL || client_ret.output == NULL ||
 		   *client_ret.out_len == 0 ||
 		   *client_ret.out_len > client_arg.output_size) {
@@ -629,14 +602,15 @@ static int msm_set_ovp(struct data_info *di)
 	client_ret.out_len = NULL;
 	client_ret.output = NULL;
 
-	dev_info(di->dev, "Setting OVP. Batt-FET %s\n",
-		 fet_switch_onoff ? "on" : "off");
+	pr_info("%s: Setting OVP. Batt-FET %s\n",
+		SEMC_BDATA_NAME, fet_switch_onoff ? "on" : "off");
 
 	rc = oem_rapi_client_streaming_function(di->rpc_client,
 						&client_arg,
 						&client_ret);
 	if (rc < 0) {
-		dev_err(di->dev, "Failed setting OVP switch. Error %d\n", rc);
+		pr_err("%s: Failed setting OVP switch. Error %d\n",
+		       SEMC_BDATA_NAME, rc);
 	} else if (client_ret.out_len == NULL ||
 		   client_ret.output == NULL ||
 		   *client_ret.out_len != client_arg.output_size) {
@@ -664,7 +638,7 @@ static void msm_platform_notify(struct data_info *di)
 	}
 	MUTEX_UNLOCK(&di->lock);
 
-	dev_dbg(di->dev, "%s\n", __func__);
+	pr_debug("%s: %s\n", SEMC_BDATA_NAME, __func__);
 
 	client_arg.event =
 		OEM_RAPI_CLIENT_EVENT_NOTIFY_PLATFORM_SET;
@@ -675,7 +649,8 @@ static void msm_platform_notify(struct data_info *di)
 						&client_arg,
 						&client_ret);
 	if (rc)
-		dev_err(di->dev, "Failed notify platform. Error %d\n", rc);
+		pr_err("%s: Failed notify platform. Error %d\n",
+		       SEMC_BDATA_NAME, rc);
 }
 
 static int get_ext_supplier_data(struct device *dev, void *data)
@@ -693,7 +668,8 @@ static int get_ext_supplier_data(struct device *dev, void *data)
 		if (!ext->get_property(ext, POWER_SUPPLY_PROP_STATUS, &ret)) {
 			struct notify_platform old_notify = di->notify;
 
-			dev_dbg(di->dev, "got status %d\n", ret.intval);
+			pr_debug("%s: got status %d\n", SEMC_BDATA_NAME,
+				 ret.intval);
 
 			di->notify.charging =
 				(POWER_SUPPLY_STATUS_CHARGING == ret.intval);
@@ -707,7 +683,8 @@ static int get_ext_supplier_data(struct device *dev, void *data)
 		if (!ext->get_property(ext, POWER_SUPPLY_PROP_HEALTH, &ret)) {
 			u8 old_ovp = di->battery_ovp;
 
-			dev_dbg(di->dev, "got health %d\n", ret.intval);
+			pr_debug("%s: got health %d\n", SEMC_BDATA_NAME,
+				 ret.intval);
 
 			di->battery_ovp =
 				(POWER_SUPPLY_HEALTH_OVERVOLTAGE == ret.intval);
@@ -759,7 +736,8 @@ static void bdata_oem_rapi_client_start_work(struct work_struct *work)
 		MUTEX_LOCK(&di->lock);
 		di->rpc_client = oem_rapi_client_init();
 		if (!di->rpc_client || IS_ERR(di->rpc_client)) {
-			dev_err(di->dev, "Failed initialize oem rapi client\n");
+			pr_err("%s: Failed initialize oem rapi client\n",
+			       SEMC_BDATA_NAME);
 			di->rpc_client = NULL;
 			MUTEX_UNLOCK(&di->lock);
 			schedule_delayed_work(&di->oem_rapi_client_start_work,
@@ -776,13 +754,19 @@ static int bdata_suspend(struct platform_device *dev, pm_message_t state)
 {
 	struct data_info *di = platform_get_drvdata(dev);
 
-	dev_dbg(di->dev, "%s\n", __func__);
+	pr_debug("%s: %s\n", SEMC_BDATA_NAME, __func__);
 
 	if (work_pending(&di->external_change_work))
 		flush_work(&di->external_change_work);
 
 	if (delayed_work_pending(&di->oem_rapi_client_start_work))
 		cancel_delayed_work(&di->oem_rapi_client_start_work);
+
+	MUTEX_LOCK(&di->lock);
+	di->notify.power_collapse = 1;
+	MUTEX_UNLOCK(&di->lock);
+
+	msm_platform_notify(di);
 
 	return 0;
 }
@@ -791,10 +775,16 @@ static int bdata_resume(struct platform_device *dev)
 {
 	struct data_info *di = platform_get_drvdata(dev);
 
-	dev_dbg(di->dev, "%s\n", __func__);
+	pr_debug("%s: %s\n", SEMC_BDATA_NAME, __func__);
 
 	if (!di->rpc_client)
 		schedule_delayed_work(&di->oem_rapi_client_start_work, 0);
+
+	MUTEX_LOCK(&di->lock);
+	di->notify.power_collapse = 0;
+	MUTEX_UNLOCK(&di->lock);
+
+	msm_platform_notify(di);
 
 	return 0;
 }
@@ -804,15 +794,14 @@ static int bdata_probe(struct platform_device *pdev)
 	struct semc_battery_platform_data *pdata;
 	struct data_info *di;
 
-	dev_info(&pdev->dev, "probe\n");
+	pr_info("%s: probe\n", SEMC_BDATA_NAME);
 
 	di = kzalloc(sizeof(struct data_info), GFP_KERNEL);
 	if (!di) {
-		dev_err(&pdev->dev, "Memory alloc fail\n");
+		pr_err("%s: Memory alloc fail\n", SEMC_BDATA_NAME);
 		return -ENOMEM;
 	}
 
-	di->dev = &pdev->dev;
 	di->bdata_ps.name = pdev->name;
 	di->bdata_ps.type = POWER_SUPPLY_TYPE_BATTERY;
 	di->bdata_ps.properties = batt_props;
@@ -825,15 +814,10 @@ static int bdata_probe(struct platform_device *pdev)
 	di->bdata.cap_percent = 50;
 	di->bdata.temp_celsius = 25;
 	di->bdata.temp_celsius_amb = 25;
-#ifdef CONFIG_SEMC_BATTERY_SHOW_HEALTH
-	di->health = POWER_SUPPLY_HEALTH_GOOD;
-#endif
 
 	pdata = (struct semc_battery_platform_data *)pdev->dev.platform_data;
 	if (pdata) {
-#ifndef CONFIG_SEMC_BATTERY_SHOW_HEALTH
 		di->set_battery_health = pdata->set_battery_health;
-#endif
 		di->use_fuelgauge = pdata->use_fuelgauge;
 
 		if (di->use_fuelgauge) {
@@ -857,7 +841,8 @@ static int bdata_probe(struct platform_device *pdev)
 			  bdata_oem_rapi_client_start_work);
 
 	if (power_supply_register(&pdev->dev, &di->bdata_ps)) {
-		dev_err(di->dev, "Failed to register power supply\n");
+		pr_err("%s: Failed to register power supply\n",
+		       SEMC_BDATA_NAME);
 		kfree(di);
 		return -EPERM;
 	}
@@ -868,7 +853,7 @@ static int bdata_probe(struct platform_device *pdev)
 
 #ifdef DEBUG_FS
 	if (semc_battery_create_attrs(di->bdata_ps.dev))
-		dev_info(di->dev, "Debug support failed\n");
+		pr_info("%s: Debug support failed\n", SEMC_BDATA_NAME);
 #endif
 
 	return 0;
@@ -878,7 +863,7 @@ static int __exit bdata_remove(struct platform_device *pdev)
 {
 	struct data_info *di = platform_get_drvdata(pdev);
 
-	dev_info(di->dev, "remove\n");
+	pr_info("%s: remove\n", SEMC_BDATA_NAME);
 
 	clear_platform_callbacks(di);
 	oem_rapi_client_close();

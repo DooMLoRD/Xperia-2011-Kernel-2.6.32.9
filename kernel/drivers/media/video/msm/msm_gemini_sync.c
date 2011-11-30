@@ -152,21 +152,6 @@ inline int msm_gemini_q_unblock(struct msm_gemini_q *q_p)
 	return 0;
 }
 
-inline void msm_gemini_outbuf_q_cleanup(struct msm_gemini_q *q_p)
-{
-	struct msm_gemini_core_buf *buf_p;
-	GMN_DBG("%s:%d] %s\n", __func__, __LINE__, q_p->name);
-	do {
-		buf_p = msm_gemini_q_out(q_p);
-		if (buf_p) {
-			msm_gemini_platform_p2v(buf_p->file);
-			GMN_DBG("%s:%d] %s\n", __func__, __LINE__, q_p->name);
-			kfree(buf_p);
-		}
-	} while (buf_p);
-	q_p->unblck = 0;
-}
-
 inline void msm_gemini_q_cleanup(struct msm_gemini_q *q_p)
 {
 	void *data;
@@ -616,7 +601,7 @@ int __msm_gemini_open(struct msm_gemini_device *pgmn_dev)
 
 	msm_gemini_q_cleanup(&pgmn_dev->evt_q);
 	msm_gemini_q_cleanup(&pgmn_dev->output_rtn_q);
-	msm_gemini_outbuf_q_cleanup(&pgmn_dev->output_buf_q);
+	msm_gemini_q_cleanup(&pgmn_dev->output_buf_q);
 	msm_gemini_q_cleanup(&pgmn_dev->input_rtn_q);
 	msm_gemini_q_cleanup(&pgmn_dev->input_buf_q);
 
@@ -635,13 +620,6 @@ int __msm_gemini_release(struct msm_gemini_device *pgmn_dev)
 	}
 	pgmn_dev->open_count--;
 	mutex_unlock(&pgmn_dev->lock);
-
-	msm_gemini_core_release();
-	msm_gemini_q_cleanup(&pgmn_dev->evt_q);
-	msm_gemini_q_cleanup(&pgmn_dev->output_rtn_q);
-	msm_gemini_outbuf_q_cleanup(&pgmn_dev->output_buf_q);
-	msm_gemini_q_cleanup(&pgmn_dev->input_rtn_q);
-	msm_gemini_outbuf_q_cleanup(&pgmn_dev->input_buf_q);
 
 	if (pgmn_dev->open_count)
 		GMN_PR_ERR(KERN_ERR "%s: multiple opens\n", __func__);

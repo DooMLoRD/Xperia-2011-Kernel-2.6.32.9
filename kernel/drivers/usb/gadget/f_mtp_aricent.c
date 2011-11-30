@@ -1029,6 +1029,8 @@ static int MtpGadgetSetup(struct usb_function *f,
 	uValue = le16_to_cpu(pControlRequest->wValue);
 	uLength = le16_to_cpu(pControlRequest->wLength);
 
+	spin_lock(&pDevice->m_Lock);
+
 	MTPDBG(pDevice, "SETUP type: %02x, uRequest: %02x, uIndex: %04x, "
 			"uValue: %04x, uLength: %04x\n",
 			pControlRequest->bRequestType,
@@ -1116,6 +1118,8 @@ static int MtpGadgetSetup(struct usb_function *f,
 			pUsbRequest->status = 0;
 		}
 	}
+
+	spin_unlock(&pDevice->m_Lock);
 
 	return nResult;
 }

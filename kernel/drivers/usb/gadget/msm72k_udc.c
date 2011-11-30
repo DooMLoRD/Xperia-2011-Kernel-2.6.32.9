@@ -186,7 +186,6 @@ struct usb_info {
 	struct workqueue_struct *wq;
 	struct delayed_work chg_det;
 	struct delayed_work chg_stop;
-
 #ifdef CONFIG_SUPPORT_ALIEN_USB_CHARGER
 	/*
 	* Since some 3rd-party wall chargers don't follow the specification they
@@ -201,10 +200,8 @@ struct usb_info {
 	struct delayed_work chg_type_work;
 	struct work_struct chg_type_stop_delayed_work;
 #endif /* CONFIG_SUPPORT_ALIEN_USB_CHARGER */
-
 	struct msm_hsusb_gadget_platform_data *pdata;
 	struct work_struct phy_status_check;
-
 
 	struct work_struct work;
 	unsigned phy_status;
@@ -245,7 +242,9 @@ static void usb_reset(struct usb_info *ui);
 static unsigned ulpi_read(struct usb_info *ui, unsigned reg)
 {
 	unsigned ret, timeout = 100000;
+	unsigned long flags;
 
+	spin_lock_irqsave(&ui->lock, flags);
 
 	/* initiate read operation */
 	writel(ULPI_RUN | ULPI_READ | ULPI_ADDR(reg),
@@ -258,16 +257,21 @@ static unsigned ulpi_read(struct usb_info *ui, unsigned reg)
 	if (timeout == 0) {
 		printk(KERN_ERR "ulpi_read: timeout %08x\n",
 			readl(USB_ULPI_VIEWPORT));
+		spin_unlock_irqrestore(&ui->lock, flags);
 		return 0xffffffff;
 	}
 	ret = ULPI_DATA_READ(readl(USB_ULPI_VIEWPORT));
 
+	spin_unlock_irqrestore(&ui->lock, flags);
 
 	return ret;
 }
 static int ulpi_write(struct usb_info *ui, unsigned val, unsigned reg)
 {
 	unsigned timeout = 10000;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ui->lock, flags);
 
 	/* initiate write operation */
 	writel(ULPI_RUN | ULPI_WRITE |
@@ -280,32 +284,12 @@ static int ulpi_write(struct usb_info *ui, unsigned val, unsigned reg)
 
 	if (timeout == 0) {
 		dev_err(&ui->pdev->dev, "ulpi_write: timeout\n");
+		spin_unlock_irqrestore(&ui->lock, flags);
 		return -1;
 	}
+	spin_unlock_irqrestore(&ui->lock, flags);
 
 	return 0;
-}
-
-static void msm_hsusb_set_speed(struct usb_info *ui)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&ui->lock, flags);
-	switch (readl(USB_PORTSC) & PORTSC_PSPD_MASK) {
-	case PORTSC_PSPD_FS:
-		dev_dbg(&ui->pdev->dev, "portchange USB_SPEED_FULL\n");
-		ui->gadget.speed = USB_SPEED_FULL;
-		break;
-	case PORTSC_PSPD_LS:
-		dev_dbg(&ui->pdev->dev, "portchange USB_SPEED_LOW\n");
-		ui->gadget.speed = USB_SPEED_LOW;
-		break;
-	case PORTSC_PSPD_HS:
-		dev_dbg(&ui->pdev->dev, "portchange USB_SPEED_HIGH\n");
-		ui->gadget.speed = USB_SPEED_HIGH;
-		break;
-	}
-	spin_unlock_irqrestore(&ui->lock, flags);
 }
 
 static void msm_hsusb_set_state(enum usb_device_state state)
@@ -412,14 +396,12 @@ static int usb_get_max_power(struct usb_info *ui)
 
 static int usb_phy_stuck_check(struct usb_info *ui)
 {
-	unsigned long flags;
 	/*
 	 * write some value (0xAA) into scratch reg (0x16) and read it back,
 	 * If the read value is same as written value, means PHY is normal
 	 * otherwise, PHY seems to have stuck.
 	 */
 
-	spin_lock_irqsave(&ui->lock, flags);
 	if (ulpi_write(ui, 0xAA, 0x16) == -1) {
 		dev_dbg(&ui->pdev->dev,
 			"%s(): ulpi write timeout\n", __func__);
@@ -430,7 +412,6 @@ static int usb_phy_stuck_check(struct usb_info *ui)
 			"%s(): read value is incorrect\n", __func__);
 		return -EIO;
 	}
-	spin_unlock_irqrestore(&ui->lock, flags);
 	return 0;
 }
 
@@ -723,10 +704,8 @@ static void usb_ept_start(struct msm_endpoint *ept)
 {
 	struct usb_info *ui = ept->ui;
 	struct msm_request *req = ept->req;
-	struct msm_request *f_req = ept->req;
+	int i, cnt;
 	unsigned n = 1 << ept->bit;
-	unsigned info;
-	int reprime_cnt = 0;
 
 	BUG_ON(req->live);
 
@@ -752,38 +731,29 @@ static void usb_ept_start(struct msm_endpoint *ept)
 	ept->head->next = ept->req->item_dma;
 	ept->head->info = 0;
 
-reprime_ept:
 	/* flush buffers before priming ept */
 	dma_coherent_pre_ops();
 
 	/* during high throughput testing it is observed that
 	 * ept stat bit is not set even thoguh all the data
 	 * structures are updated properly and ept prime bit
-	 * is set. To workaround the issue, use dTD INFO bit
-	 * to make decision on re-prime or not.
+	 * is set. To workaround the issue, try to check if
+	 * ept stat bit otherwise try to re-prime the ept
 	 */
-	writel(n, USB_ENDPTPRIME);
-	/* busy wait till endptprime gets clear */
-	while ((readl(USB_ENDPTPRIME) & n))
-		;
-	if (readl(USB_ENDPTSTAT) & n)
-		return;
-
-	dma_coherent_post_ops();
-	info = f_req->item->info;
-	if (info & INFO_ACTIVE) {
-		if (reprime_cnt++ < 3)
-			goto reprime_ept;
-		else
-			pr_err("%s(): ept%d%s prime failed. ept: config: %x"
-				"active: %x next: %x info: %x\n"
-				" req@ %x next: %x info: %x\n",
-				__func__, ept->num,
-				ept->flags & EPT_FLAG_IN ? "in" : "out",
-				ept->head->config, ept->head->active,
-				ept->head->next, ept->head->info,
-				f_req->item_dma, f_req->item->next, info);
+	for (i = 0; i < 5; i++) {
+		writel(n, USB_ENDPTPRIME);
+		for (cnt = 0; cnt < 3000; cnt++) {
+			if (!(readl(USB_ENDPTPRIME) & n) &&
+					(readl(USB_ENDPTSTAT) & n))
+				return;
+			udelay(1);
+		}
 	}
+
+	if (!(readl(USB_ENDPTSTAT) & n))
+		pr_err("Unable to prime the ept%d%s\n",
+				ept->num,
+				ept->flags & EPT_FLAG_IN ? "in" : "out");
 }
 
 int usb_ept_queue_xfer(struct msm_endpoint *ept, struct usb_request *_req)
@@ -1085,18 +1055,6 @@ static void handle_setup(struct usb_info *ui)
 			atomic_set(&ui->configured, !!ctl.wValue);
 			msm_hsusb_set_state(USB_STATE_CONFIGURED);
 		} else if (ctl.bRequest == USB_REQ_SET_ADDRESS) {
-			/*
-			 * Gadget speed should be set when PCI interrupt
-			 * occurs. But sometimes, PCI interrupt is not
-			 * occuring after reset. Hence update the gadget
-			 * speed here.
-			 */
-			if (ui->gadget.speed == USB_SPEED_UNKNOWN) {
-				dev_info(&ui->pdev->dev,
-					"PCI intr missed"
-					"set speed explictly\n");
-				msm_hsusb_set_speed(ui);
-			}
 			msm_hsusb_set_state(USB_STATE_ADDRESS);
 
 			/* write address delayed (will take effect
@@ -1312,7 +1270,26 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 #ifdef CONFIG_SUPPORT_ALIEN_USB_CHARGER
 		struct msm_otg *otg = to_msm_otg(ui->xceiv);
 #endif
-		msm_hsusb_set_speed(ui);
+		switch (readl(USB_PORTSC) & PORTSC_PSPD_MASK) {
+		case PORTSC_PSPD_FS:
+			dev_info(&ui->pdev->dev, "portchange USB_SPEED_FULL\n");
+			spin_lock_irqsave(&ui->lock, flags);
+			ui->gadget.speed = USB_SPEED_FULL;
+			spin_unlock_irqrestore(&ui->lock, flags);
+			break;
+		case PORTSC_PSPD_LS:
+			dev_info(&ui->pdev->dev, "portchange USB_SPEED_LOW\n");
+			spin_lock_irqsave(&ui->lock, flags);
+			ui->gadget.speed = USB_SPEED_LOW;
+			spin_unlock_irqrestore(&ui->lock, flags);
+			break;
+		case PORTSC_PSPD_HS:
+			dev_info(&ui->pdev->dev, "portchange USB_SPEED_HIGH\n");
+			spin_lock_irqsave(&ui->lock, flags);
+			ui->gadget.speed = USB_SPEED_HIGH;
+			spin_unlock_irqrestore(&ui->lock, flags);
+			break;
+		}
 
 #ifdef CONFIG_SUPPORT_ALIEN_USB_CHARGER
 		if (atomic_read(&otg->chg_type) == USB_CHG_TYPE__INVALID) {
@@ -1477,16 +1454,16 @@ static void usb_prepare(struct usb_info *ui)
 	INIT_DELAYED_WORK(&ui->chg_det, usb_chg_detect);
 	INIT_DELAYED_WORK(&ui->chg_stop, usb_chg_stop);
 	INIT_DELAYED_WORK(&ui->rw_work, usb_do_remote_wakeup);
+	if (ui->pdata && ui->pdata->is_phy_status_timer_on)
+		INIT_WORK(&ui->phy_status_check, usb_phy_stuck_recover);
 
 #ifdef CONFIG_SUPPORT_ALIEN_USB_CHARGER
 	INIT_DELAYED_WORK(&ui->chg_type_work, usb_check_chg_type_work);
 	INIT_WORK(&ui->chg_type_stop_delayed_work,
 		  usb_stop_delayed_chg_type_work_start_immediate_work);
 #endif /* CONFIG_SUPPORT_ALIEN_USB_CHARGER */
-
 	if (ui->pdata && ui->pdata->is_phy_status_timer_on)
 		INIT_WORK(&ui->phy_status_check, usb_phy_stuck_recover);
-
 }
 
 static void usb_reset(struct usb_info *ui)
@@ -1685,7 +1662,10 @@ static void usb_do_work(struct work_struct *w)
 				if (ui->driver) {
 					dev_dbg(&ui->pdev->dev,
 						"usb: notify offline\n");
-					ui->driver->disconnect(&ui->gadget);
+					if (ui->driver->offline)
+						ui->driver->offline(&ui->gadget);
+					else
+						ui->driver->disconnect(&ui->gadget);
 				}
 
 				switch_set_state(&ui->sdev, 0);
@@ -1703,7 +1683,8 @@ static void usb_do_work(struct work_struct *w)
 				if (maxpower < 0)
 					break;
 
-				otg_set_power(ui->xceiv, 0);
+				if (atomic_read(&otg->chg_type) == USB_CHG_TYPE__SDP)
+					otg_set_power(ui->xceiv, 0);
 				/* To support TCXO during bus suspend
 				 * This might be dummy check since bus suspend
 				 * is not implemented as of now
@@ -2470,7 +2451,7 @@ static ssize_t show_usb_chg_type(struct device *dev,
 	return count;
 }
 static DEVICE_ATTR(wakeup, S_IWUSR, 0, usb_remote_wakeup);
-static DEVICE_ATTR(usb_state, S_IRUGO, show_usb_state, 0);
+static DEVICE_ATTR(usb_state, S_IRUSR, show_usb_state, 0);
 static DEVICE_ATTR(usb_speed, S_IRUSR, show_usb_speed, 0);
 static DEVICE_ATTR(chg_type, S_IRUSR, show_usb_chg_type, 0);
 static DEVICE_ATTR(chg_current, S_IWUSR | S_IRUSR,

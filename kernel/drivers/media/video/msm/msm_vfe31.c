@@ -509,6 +509,7 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 		/* set from user driver side start */
 		/* *p = 0x200;*/    /* preview with wm0 & wm1 */
 		/* set from user driver side end */
+
 		vfe31_ctrl->outpath.out0.ch0 = 0; /* luma   */
 		vfe31_ctrl->outpath.out0.ch1 = 1; /* chroma */
 		regp1 = &(ad->region[ad->bufnum1]);
@@ -670,6 +671,7 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 		if (ad->bufnum2 < 1)
 			return -EINVAL;
 		CDBG("config axi for raw snapshot.\n");
+		*p = 0x60;    /* raw snapshot with wm0 */
 		vfe31_ctrl->outpath.out1.ch0 = 0; /* raw */
 		regp1 = &(ad->region[ad->bufnum1]);
 		vfe31_ctrl->outpath.output_mode |= VFE31_OUTPUT_MODE_S;

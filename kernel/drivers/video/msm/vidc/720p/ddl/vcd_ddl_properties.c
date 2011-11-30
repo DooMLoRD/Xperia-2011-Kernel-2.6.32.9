@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -404,13 +404,10 @@ static u32 ddl_set_enc_property(struct ddl_client_context *ddl,
 				(struct vcd_property_frame_size *)
 				property_value;
 
-			if (sizeof(struct vcd_property_frame_size)
-				== property_hdr->sz &&
-				DDL_ALLOW_ENC_FRAMESIZE(framesize->width,
-				framesize->height) &&
-				(encoder->codec.codec == VCD_CODEC_H264 ||
-				 DDL_VALIDATE_ENC_FRAMESIZE(framesize->width,
-				 framesize->height))
+			if ((sizeof(struct vcd_property_frame_size)
+				== property_hdr->sz) &&
+				(DDL_ALLOW_ENC_FRAMESIZE(framesize->width,
+				framesize->height))
 				) {
 				encoder->frame_size = *framesize;
 				ddl_calculate_stride(&encoder->frame_size,

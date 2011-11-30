@@ -209,7 +209,6 @@ struct rpcrouter_xprt_info {
 	uint32_t need_len;
 	struct work_struct read_data;
 	struct workqueue_struct *workqueue;
-	unsigned char r2r_buf[RPCROUTER_MSGSIZE_MAX];
 };
 
 static LIST_HEAD(xprt_info_list);
@@ -941,6 +940,8 @@ static char *type_to_str(int i)
 }
 #endif
 
+static uint32_t r2r_buf[RPCROUTER_MSGSIZE_MAX];
+
 static void do_read_data(struct work_struct *work)
 {
 	struct rr_header hdr;
@@ -983,10 +984,9 @@ static void do_read_data(struct work_struct *work)
 		if (xprt_info->remote_pid == -1)
 			xprt_info->remote_pid = hdr.src_pid;
 
-		if (rr_read(xprt_info, xprt_info->r2r_buf, hdr.size))
+		if (rr_read(xprt_info, r2r_buf, hdr.size))
 			goto fail_io;
-		process_control_msg(xprt_info,
-				    (void *) xprt_info->r2r_buf, hdr.size);
+		process_control_msg(xprt_info, (void *) r2r_buf, hdr.size);
 		goto done;
 	}
 
@@ -1088,7 +1088,7 @@ static void do_read_data(struct work_struct *work)
 packet_complete:
 	spin_lock_irqsave(&ept->read_q_lock, flags);
 	D("%s: take read lock on ept %p\n", __func__, ept);
-	wake_lock_timeout(&ept->read_q_wake_lock, HZ*10);
+	wake_lock(&ept->read_q_wake_lock);
 	list_add_tail(&pkt->list, &ept->read_q);
 	wake_up(&ept->wait_q);
 	spin_unlock_irqrestore(&ept->read_q_lock, flags);

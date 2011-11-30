@@ -22,10 +22,6 @@
 #include "mmc_ops.h"
 #include "sd_ops.h"
 
-#ifdef CONFIG_MMC_SD_CHECK_BOOT_SIGNATURE
-#include "sd_check_mbr.h"
-#endif
-
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -564,11 +560,7 @@ static void mmc_sd_detect(struct mmc_host *host)
 {
 	int err = 0;
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
-#ifndef CONFIG_MMC_SD_DETECT_CHATTERING
         int retries = 5;
-#else
-        int retries = 100;
-#endif
 #endif
 
 	BUG_ON(!host);
@@ -584,11 +576,7 @@ static void mmc_sd_detect(struct mmc_host *host)
 		err = mmc_send_status(host->card, NULL);
 		if (err) {
 			retries--;
-#ifndef CONFIG_MMC_SD_DETECT_CHATTERING
 			udelay(5);
-#else
-			mdelay(1);
-#endif
 			continue;
 		}
 		break;
@@ -798,13 +786,6 @@ int mmc_attach_sd(struct mmc_host *host, u32 ocr)
 	err = mmc_sd_init_card(host, host->ocr, NULL);
 	if (err)
 		goto err;
-#endif
-
-#ifdef CONFIG_MMC_SD_CHECK_BOOT_SIGNATURE
-	if (mmc_sd_check_boot_signature(host->card)) {
-		err = -EFAULT;
-		goto err;
-	}
 #endif
 
 	mmc_release_host(host);

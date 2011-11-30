@@ -2985,23 +2985,14 @@ static int __init proc_modules_init(void)
 module_init(proc_modules_init);
 #endif
 
-/* Attempt to prevent corruption caused by recursive data abort */
-#define patch_list_for_each_entry_rcu(pos, head, member) \
-for (pos = list_entry_rcu((head)->next, typeof(*pos), member); \
-/*	 prefetch(pos->member.next), &pos->member != (head); */\
-	 (pos && pos->member.next && &pos->member != (head))? 1: 0; \
-	 pos = list_entry_rcu(pos->member.next, typeof(*pos), member))
-
-/* File scope to be able to inspect variable in Crash-tool. Set debug pattern. */
-static struct module *mod = (struct module *)0xA5A5A5A5;
-
 /* Given an address, look for it in the module exception tables. */
 const struct exception_table_entry *search_module_extables(unsigned long addr)
 {
 	const struct exception_table_entry *e = NULL;
+	struct module *mod;
 
 	preempt_disable();
-	patch_list_for_each_entry_rcu(mod, &modules, list) {
+	list_for_each_entry_rcu(mod, &modules, list) {
 		if (mod->num_exentries == 0)
 			continue;
 

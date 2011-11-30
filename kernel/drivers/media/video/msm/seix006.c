@@ -71,7 +71,6 @@ static int32_t seix006_snapshot_config(void);
 static int32_t seix006_half_release_config(void);
 static int32_t seix006_set_test_pattern(enum set_test_pattern_t mode);
 static int32_t seix006_set_iso(uint16_t iso_mode);
-static int32_t seix006_set_focus_mode(enum camera_focus_mode focus_mode);
 static int32_t seix006_update_focus_mode(enum camera_focus_mode focus_mode);
 static int32_t seix006_set_scene(enum camera_scene scene);
 static int32_t seix006_update_scene(enum camera_scene start_scene);
@@ -660,11 +659,7 @@ static int32_t seix006_set_sensor_mode(struct sensor_cfg_data cfg_data)
 			 * conditions etc */
 			msleep(1000);
 		}
-		seix006_set_focus_mode(cfg_data.cfg.focus_mode);
-		/* check if asked to set focus mode only or start auto focus */
-		if (cfg_data.rs)
-			break;
-
+		seix006_update_focus_mode(cfg_data.cfg.focus_mode);
 		ret = seix006_half_release_config();
 		CDBG("seix006_set_sensor_mode SENSOR_HALF_RELEASE_MODE done\n");
 		break;
@@ -711,8 +706,7 @@ static int32_t seix006_monitor_config()
 
 	ret = seix006_i2c_read(SEIX006_USERCTRL_0010, BYTE_1, &data);
 
-	if (data == SEIX006_MSTS_HR_VAL ||
-		seix006_ctrl->autoflash_assist_light_on) {
+	if (data == SEIX006_MSTS_HR_VAL) {
 		switch (seix006_ctrl->scene) {
 		case SENSOR_SCENE_TWILIGHT:
 		case SENSOR_SCENE_TWILIGHT_PORTRAIT:
@@ -1055,8 +1049,6 @@ static int32_t seix006_half_release_config()
 				mdelay(1500);
 			}
 			CDBG("seix006_half_relase_config SENSOR_FOCUS_MODE_FIXED [E]\n");
-			datawb = 0x00;
-			seix006_i2c_write(0x6D77, BYTE_1, &datawb);
 			return ret;
 		}
 
@@ -1375,27 +1367,6 @@ static int32_t seix006_update_scan_range(enum camera_focus_mode focus_mode,
 }
 
 /**
- * Set focus mode
- *
- */
-static int32_t seix006_set_focus_mode(enum camera_focus_mode focus_mode)
-{
-	int32_t ret = 0;
-
-	CDBG("seix006_set_focus_mode [S]\n");
-
-	if (seix006_ctrl->focus_mode != focus_mode) {
-		seix006_ctrl->focus_mode = focus_mode;
-
-		if (seix006_ctrl->init_complete)
-			ret = seix006_update_focus_mode(focus_mode);
-	}
-	CDBG("seix006_set_focus_mode [E] ret[%d]\n", ret);
-
-	return ret;
-}
-
-/**
  * Update focus_mode
  *
  */
@@ -1404,6 +1375,12 @@ static int32_t seix006_update_focus_mode(enum camera_focus_mode focus_mode)
 	int32_t ret = 0;
 
 	CDBG("seix006_update_focus_mode [S]\n");
+	if (seix006_ctrl->focus_mode == focus_mode ||
+			!seix006_ctrl->init_complete) {
+		return ret;
+	}
+
+	seix006_ctrl->focus_mode = focus_mode;
 
 	switch (focus_mode) {
 	case SENSOR_FOCUS_MODE_AUTO:
@@ -1594,8 +1571,7 @@ static int32_t seix006_set_preview_dimension(struct camera_preview_dimension_t d
 			else
 				ret = seix006_refresh_monitor(SEIX006_POLLING_TIMES);
 		}
-	} else if (dimension.sensor_width == 800 &&
-			dimension.sensor_height == 480) {
+	} else if (dimension.sensor_width == 800 && dimension.sensor_height == 480) {
 		if (current_width == 800) {
 			CDBG("WVGA preview size already set\n");
 		} else {
@@ -1609,28 +1585,10 @@ static int32_t seix006_set_preview_dimension(struct camera_preview_dimension_t d
 			else
 				ret = seix006_refresh_monitor(SEIX006_POLLING_TIMES);
 		}
-	} else if (dimension.sensor_width == 1280 &&
-				dimension.sensor_height == 720) {
-		if (current_width == 1280) {
-			CDBG("HD720 preview size already set\n");
-		} else {
-			CDBG("Setting HD720 preview size 1280x720\n");
-			ret = seix006_send_reg_table(
-					seix006_vf_resolution_1280x720,
-					sizeof_seix006_vf_resolution_1280x720
-					/ sizeof(struct reg_entry));
-			if (ret)
-				CDBG("Setting HD720 preview size failed\n");
-			else
-				ret = seix006_refresh_monitor(
-						SEIX006_POLLING_TIMES);
-		}
 	}
 
 	seix006_i2c_read(0x0022, BYTE_2, (int8_t *) &current_width);
-
-	CDBG("seix006_set_preview_dimension New sensor output is %dx%d",
-			current_width, (current_width == 1280 ? 720 : 480));
+	CDBG("seix006_set_preview_dimension New sensor output is %dx480",current_width);
 
 	CDBG("seix006_set_preview_dimension [E] ret[%d]\n", ret);
 
@@ -2001,7 +1959,6 @@ static int32_t seix006_sensor_init(void)
 
 	seix006_ctrl->dev_mode = CAMERA_MODE_MONITOR;
 	seix006_ctrl->scene = SENSOR_SCENE_AUTO;
-	seix006_ctrl->focus_mode = SENSOR_FOCUS_MODE_AUTO;
 	seix006_ctrl->init_complete = 0;
 	seix006_ctrl->af_4838_val = seix006_ctrl->calibration_data.af_l;
 	seix006_ctrl->scan_range_reg = SEIX006_SCAN_RANGE_REG_AUTO;
@@ -2867,7 +2824,6 @@ static int init_thread(void* data)
 		}
 	}
 	ret = seix006_update_scene(seix006_ctrl->scene);
-	ret = seix006_update_focus_mode(seix006_ctrl->focus_mode);
 	seix006_ctrl->init_complete = 1;
 
 	up(&seix006_sem);
@@ -2887,24 +2843,22 @@ static int32_t seix006_raw_rgb_stream_config()
 
 	seix006_i2c_write(0x001E, BYTE_1, &data);
 
-	ret = seix006_send_reg_table(seix006_mode_movie,
-		sizeof_seix006_mode_movie/sizeof(struct reg_entry));
+	ret = seix006_send_reg_table(seix006_mode_movie, sizeof_seix006_mode_movie/sizeof(struct reg_entry));
 	if(ret) {
-		CDBG("seix006_raw_rgb_stream_config failed\n");
+		CDBG("seix006_movie_config failed\n");
 		return ret;
 	}
 
 	/* wait MODESEL_FIX to 3 */
 	ret = seix006_check_msts(SEIX006_MSTS_MOV_VAL, SEIX006_POLLING_TIMES);
 	if(ret) {
-		CDBG("seix006_raw_rgb_stream_config "
-				"seix006_check_msts failed\n");
+		CDBG("seix006_monitor_config seix006_check_msts failed\n");
 		/* Continue silently */
 	}
 
 	seix006_ctrl->dev_mode = CAMERA_MODE_MOVIE;
 
-	CDBG("seix006_raw_rgb_stream_config [E] ret[%d]\n", ret);
+	CDBG("seix006_raw_snapshot_config [E] ret[%d]\n",ret);
 
 	return ret;
 }
@@ -2930,7 +2884,7 @@ static int32_t seix006_movie_config()
 	/* wait MODESEL_FIX to 3 */
 	ret = seix006_check_msts(SEIX006_MSTS_MOV_VAL, SEIX006_POLLING_TIMES);
 	if(ret) {
-		CDBG("seix006_movie_config  seix006_check_msts failed\n");
+		CDBG("seix006_monitor_config seix006_check_msts failed\n");
 		/* Continue silently */
 	}
 

@@ -74,9 +74,6 @@ static void mmc_test_prepare_mrq(struct mmc_test_card *test,
 	}
 
 	mrq->cmd->arg = dev_addr;
-	if (!mmc_card_blockaddr(test->card))
-		mrq->cmd->arg <<= 9;
-
 	mrq->cmd->flags = MMC_RSP_R1 | MMC_CMD_ADTC;
 
 	if (blocks == 1)
@@ -113,11 +110,8 @@ static int mmc_test_wait_busy(struct mmc_test_card *test)
 		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
 
 		ret = mmc_wait_for_cmd(test->card->host, &cmd, 0);
-		if (ret){
-			printk(KERN_ERR "%s: error %d requesting status\n",
-				mmc_hostname(test->card->host), ret);
+		if (ret)
 			break;
-		}
 
 		if (!busy && !(cmd.resp[0] & R1_READY_FOR_DATA)) {
 			busy = 1;
@@ -125,14 +119,7 @@ static int mmc_test_wait_busy(struct mmc_test_card *test)
 				"wait for busy state to end.\n",
 				mmc_hostname(test->card->host));
 		}
-	/*
-	 * Some cards mishandle the status bits,
-	 * so make sure to check both the busy
-	 * indication and the card state.
-	 */
-	} while (!(cmd.resp[0] & R1_READY_FOR_DATA) ||
-		(R1_CURRENT_STATE(cmd.resp[0]) == 7));
-
+	} while (!(cmd.resp[0] & R1_READY_FOR_DATA));
 
 	return ret;
 }
@@ -203,7 +190,7 @@ static int __mmc_test_prepare(struct mmc_test_card *test, int write)
 	}
 
 	for (i = 0;i < BUFFER_SIZE / 512;i++) {
-		ret = mmc_test_buffer_transfer(test, test->buffer, i, 512, 1);
+		ret = mmc_test_buffer_transfer(test, test->buffer, i * 512, 512, 1);
 		if (ret)
 			return ret;
 	}
@@ -232,7 +219,7 @@ static int mmc_test_cleanup(struct mmc_test_card *test)
 	memset(test->buffer, 0, 512);
 
 	for (i = 0;i < BUFFER_SIZE / 512;i++) {
-		ret = mmc_test_buffer_transfer(test, test->buffer, i, 512, 1);
+		ret = mmc_test_buffer_transfer(test, test->buffer, i * 512, 512, 1);
 		if (ret)
 			return ret;
 	}
@@ -439,7 +426,7 @@ static int mmc_test_transfer(struct mmc_test_card *test,
 		for (i = 0;i < sectors;i++) {
 			ret = mmc_test_buffer_transfer(test,
 				test->buffer + i * 512,
-				dev_addr + i, 512, 0);
+				dev_addr + i * 512, 512, 0);
 			if (ret)
 				return ret;
 		}

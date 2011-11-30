@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,7 +41,6 @@
 #define PMAPP_SMPS_CLOCK_VOTE_PROC		26
 #define PMAPP_CLOCK_VOTE_PROC			27
 #define PMAPP_SMPS_MODE_VOTE_PROC		28
-#define PMAPP_VREG_PINCNTRL_VOTE_PROC		30
 
 /* Clock voter name max length */
 #define PMAPP_CLOCK_VOTER_ID_LEN		4
@@ -409,6 +408,7 @@ static int pmapp_rpc_req_reply(struct pmapp_buf *tbuf, struct pmapp_buf *rbuf,
 
 	if (len <= 0) {
 		printk(KERN_ERR "%s: rpc failed! len = %d\n", __func__, len);
+		pm->endpoint = NULL;	/* re-connect later ? */
 		return len;
 	}
 
@@ -518,15 +518,3 @@ int pmapp_smps_mode_vote(const char *voter_id, uint vreg_id, uint mode)
 				  PMAPP_SMPS_MODE_VOTE_PROC);
 }
 EXPORT_SYMBOL(pmapp_smps_mode_vote);
-
-int pmapp_vreg_pincntrl_vote(const char *voter_id, uint vreg_id,
-						uint clock_id, uint vote)
-{
-	if (strlen(voter_id) != PMAPP_CLOCK_VOTER_ID_LEN)
-		return -EINVAL;
-
-	return pmapp_rpc_set_only(*((uint *) voter_id), vreg_id, clock_id,
-					vote, 4,
-					PMAPP_VREG_PINCNTRL_VOTE_PROC);
-}
-EXPORT_SYMBOL(pmapp_vreg_pincntrl_vote);

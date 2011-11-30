@@ -5,10 +5,6 @@
 
 /* most of this stuff is shared between the cy8c204 and cy8ctma300 devices */
 
-struct cypress_callback {
-	void (*cb)(void *, int);
-};
-
 struct cypress_touch_platform_data {
 	u8	gpio_irq_pin;
 	u8	gpio_reset_pin;
@@ -20,7 +16,6 @@ struct cypress_touch_platform_data {
 	int	irq_polarity;
 	int	reset_polarity;
 	int	no_fw_update;
-	void	(*register_cb)(struct cypress_callback *);
 };
 
 struct cy8c204_touch_ioctl_clbr {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -59,7 +59,6 @@ int libra_sdio_configure(sdio_irq_handler_t libra_sdio_rxhandler,
 	if (sdio_set_block_size(func, blksize)) {
 		printk(KERN_ERR "%s: Unable to set the block size.\n",
 				__func__);
-		sdio_release_host(func);
 		goto cfg_error;
 	}
 
@@ -116,52 +115,12 @@ EXPORT_SYMBOL(libra_sdio_configure_suspend_resume);
  */
 void libra_sdio_deconfigure(struct sdio_func *func)
 {
-	if (NULL == libra_sdio_func)
-		return;
-
 	sdio_claim_host(func);
 	sdio_release_irq(func);
 	sdio_disable_func(func);
 	sdio_release_host(func);
 }
 EXPORT_SYMBOL(libra_sdio_deconfigure);
-
-int libra_enable_sdio_irq(struct sdio_func *func, u8 enable)
-{
-	if (libra_mmc_host && libra_mmc_host->ops &&
-			libra_mmc_host->ops->enable_sdio_irq) {
-		libra_mmc_host->ops->enable_sdio_irq(libra_mmc_host, enable);
-		return 0;
-	}
-
-	printk(KERN_ERR "%s: Could not enable disable irq\n", __func__);
-	return -EINVAL;
-}
-EXPORT_SYMBOL(libra_enable_sdio_irq);
-
-/*
- * libra_sdio_release_irq() - Function to release IRQ
- */
-void libra_sdio_release_irq(struct sdio_func *func)
-{
-	if (NULL == libra_sdio_func)
-		return;
-
-	sdio_release_irq(func);
-}
-EXPORT_SYMBOL(libra_sdio_release_irq);
-
-/*
- * libra_sdio_disable_func() - Function to disable sdio func
- */
-void libra_sdio_disable_func(struct sdio_func *func)
-{
-	if (NULL == libra_sdio_func)
-		return;
-
-	sdio_disable_func(func);
-}
-EXPORT_SYMBOL(libra_sdio_disable_func);
 
 /*
  * Return the SDIO Function device
@@ -178,9 +137,6 @@ EXPORT_SYMBOL(libra_getsdio_funcdev);
 void libra_sdio_setprivdata(struct sdio_func *sdio_func_dev,
 		void *padapter)
 {
-	if (NULL == libra_sdio_func)
-		return;
-
 	sdio_set_drvdata(sdio_func_dev, padapter);
 }
 EXPORT_SYMBOL(libra_sdio_setprivdata);
@@ -200,9 +156,6 @@ EXPORT_SYMBOL(libra_sdio_getprivdata);
 void libra_claim_host(struct sdio_func *sdio_func_dev,
 		pid_t *curr_claimed, pid_t current_pid, atomic_t *claim_count)
 {
-	if (NULL == libra_sdio_func)
-		return;
-
 	if (*curr_claimed == current_pid) {
 		atomic_inc(claim_count);
 		return;
@@ -223,10 +176,6 @@ EXPORT_SYMBOL(libra_claim_host);
 void libra_release_host(struct sdio_func *sdio_func_dev,
 		pid_t *curr_claimed, pid_t current_pid, atomic_t *claim_count)
 {
-
-	if (NULL == libra_sdio_func)
-		return;
-
 	if (*curr_claimed != current_pid) {
 		/* Dont release  */
 		return;
@@ -277,21 +226,6 @@ int libra_sdio_memcpy_toio(struct sdio_func *func,
 	return sdio_memcpy_toio(func, addr, src, count);
 }
 EXPORT_SYMBOL(libra_sdio_memcpy_toio);
-
-int libra_detect_card_change(void)
-{
-	if (libra_mmc_host) {
-		if (!strcmp(libra_mmc_host->class_dev.class->name, "mmc_host")
-			&& (libra_mmc_host_index == libra_mmc_host->index)) {
-			mmc_detect_change(libra_mmc_host, 0);
-			return 0;
-		}
-	}
-
-	printk(KERN_ERR "%s: Could not trigger card change\n", __func__);
-	return -EINVAL;
-}
-EXPORT_SYMBOL(libra_detect_card_change);
 
 int libra_sdio_enable_polling(void)
 {
@@ -355,15 +289,9 @@ static int libra_sdio_suspend(struct device *dev)
 			__func__);
 		return ret;
 	}
-	if (libra_suspend_hldr) {
-		ret = libra_suspend_hldr(func);
-		if (ret) {
-			printk(KERN_ERR
-			"%s: Libra driver is not able to suspend\n" , __func__);
-			return ret;
-		}
-	}
 
+	if (libra_suspend_hldr)
+		libra_suspend_hldr(func);
 
 	return sdio_set_host_pm_flags(func, MMC_PM_WAKE_SDIO_IRQ);
 }

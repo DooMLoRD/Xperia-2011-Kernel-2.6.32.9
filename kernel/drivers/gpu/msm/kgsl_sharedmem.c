@@ -282,16 +282,16 @@ kgsl_sharedmem_free(struct kgsl_memdesc *memdesc)
 			shmem, memdesc, memdesc->physaddr, memdesc->size);
 
 	BUG_ON(memdesc == NULL);
+	BUG_ON(memdesc->size <= 0);
+	BUG_ON(shmem->physbase > memdesc->physaddr);
+	BUG_ON((shmem->physbase + shmem->size)
+	       < (memdesc->physaddr + memdesc->size));
 
-	if (memdesc->size > 0) {
-		if (memdesc->priv & KGSL_MEMFLAGS_CONPHYS)
-			dma_free_coherent(NULL, memdesc->size, 
-					memdesc->hostptr,
-				  	memdesc->physaddr);
-		else
-			gen_pool_free(shmem->pool, memdesc->physaddr, 
-					memdesc->size);
-	}
+	if (memdesc->priv & KGSL_MEMFLAGS_CONPHYS)
+		dma_free_coherent(NULL, memdesc->size, memdesc->hostptr,
+				  memdesc->physaddr);
+	else
+		gen_pool_free(shmem->pool, memdesc->physaddr, memdesc->size);
 
 	memset(memdesc, 0, sizeof(struct kgsl_memdesc));
 	KGSL_MEM_VDBG("return\n");

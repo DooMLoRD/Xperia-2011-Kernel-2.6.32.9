@@ -26,7 +26,6 @@
 #include <linux/io.h>
 #include <linux/crc16.h>
 #include <linux/bitrev.h>
-#include <linux/pm_qos_params.h>
 
 #include <asm/dma.h>
 #include <asm/mach/flash.h>
@@ -68,8 +67,6 @@ unsigned crci_mask;
 #define FLASH_READ_ONFI_PARAMETERS_ADDRESS 0x00
 
 #define VERBOSE 0
-#define MODULE_NAME "msm_nand"
-#define PM_QOS_NO_ISAPC 10
 
 struct msm_nand_chip {
 	struct device *dev;
@@ -253,13 +250,11 @@ unsigned flash_rd_reg(struct msm_nand_chip *chip, unsigned addr)
 		(msm_virt_to_dma(chip, &dma_buffer->cmd) >> 3) | CMD_PTR_LP;
 	dma_buffer->data = 0xeeeeeeee;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(
 		chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST |
 		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	rv = dma_buffer->data;
 
@@ -289,13 +284,11 @@ void flash_wr_reg(struct msm_nand_chip *chip, unsigned addr, unsigned val)
 		(msm_virt_to_dma(chip, &dma_buffer->cmd) >> 3) | CMD_PTR_LP;
 	dma_buffer->data = val;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(
 		chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST |
 		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
 }
@@ -377,12 +370,10 @@ uint32_t flash_read_id(struct msm_nand_chip *chip)
 	dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd) >> 3
 			) | CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST |
 		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	pr_info("status: %x\n", dma_buffer->data[3]);
 	pr_info("nandid: %x maker %02x device %02x\n",
@@ -546,7 +537,6 @@ uint32_t flash_onfi_probe(struct msm_nand_chip *chip)
 		return err;
 	}
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	wait_event(chip->wait_queue, (onfi_identifier_buf =
 		msm_nand_get_dma_buffer(chip, ONFI_IDENTIFIER_LENGTH)));
 	dma_addr_identifier = msm_virt_to_dma(chip, onfi_identifier_buf);
@@ -786,7 +776,6 @@ uint32_t flash_onfi_probe(struct msm_nand_chip *chip)
 			}
 		}
 	}
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
 	msm_nand_release_dma_buffer(chip, onfi_param_info_buf,
@@ -924,7 +913,6 @@ static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
 		}
 	}
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	wait_event(chip->wait_queue,
 		   (dma_buffer = msm_nand_get_dma_buffer(
 			    chip, sizeof(*dma_buffer))));
@@ -1181,7 +1169,6 @@ static int msm_nand_read_oob(struct mtd_info *mtd, loff_t from,
 		pages_read++;
 		page++;
 	}
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
 
 	if (ops->oobbuf) {
@@ -1343,7 +1330,6 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 		}
 	}
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	wait_event(chip->wait_queue,
 		   (dma_buffer = msm_nand_get_dma_buffer(
 			    chip, sizeof(*dma_buffer))));
@@ -1618,8 +1604,7 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 			/* read data block
 			 * (only valid if status says success)
 			 */
-			if (ops->datbuf || (ops->oobbuf &&
-						 ops->mode != MTD_OOB_AUTO)) {
+			if (ops->datbuf) {
 				if (ops->mode != MTD_OOB_RAW)
 					sectordatasize = (n < (cwperpage - 1))
 					? 516 : (512 - ((cwperpage - 1) << 2));
@@ -1674,19 +1659,12 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 					cmd->len = 4;
 					cmd++;
 
-					/* Read only when there is data
-					 * buffer
-					 */
-					if (ops->datbuf) {
-						cmd->cmd = 0;
-						cmd->src =
-						NC01(MSM_NAND_FLASH_BUFFER);
-						cmd->dst = data_dma_addr_curr;
-						data_dma_addr_curr +=
-						sectordatasize;
-						cmd->len = sectordatasize;
-						cmd++;
-					}
+					cmd->cmd = 0;
+					cmd->src = NC01(MSM_NAND_FLASH_BUFFER);
+					cmd->dst = data_dma_addr_curr;
+					data_dma_addr_curr += sectordatasize;
+					cmd->len = sectordatasize;
+					cmd++;
 				} else {
 					/* MASK DATA ACK/REQ -->
 					 * NC01 (0xA3C)
@@ -1743,20 +1721,12 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 						cmd->len = 4;
 						cmd++;
 					}
-
-					/* Read only when there is data
-					 * buffer
-					 */
-					if (ops->datbuf) {
-						cmd->cmd = 0;
-						cmd->src =
-						NC10(MSM_NAND_FLASH_BUFFER);
-						cmd->dst = data_dma_addr_curr;
-						data_dma_addr_curr +=
-						sectordatasize;
-						cmd->len = sectordatasize;
-						cmd++;
-					}
+					cmd->cmd = 0;
+					cmd->src = NC10(MSM_NAND_FLASH_BUFFER);
+					cmd->dst = data_dma_addr_curr;
+					data_dma_addr_curr += sectordatasize;
+					cmd->len = sectordatasize;
+					cmd++;
 				}
 			}
 
@@ -1987,7 +1957,6 @@ static int msm_nand_read_oob_dualnandc(struct mtd_info *mtd, loff_t from,
 		page++;
 	}
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
 
 	if (ops->oobbuf) {
@@ -2149,7 +2118,6 @@ msm_nand_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 	else
 		page_count = ops->len / (mtd->writesize + mtd->oobsize);
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	wait_event(chip->wait_queue, (dma_buffer =
 			msm_nand_get_dma_buffer(chip, sizeof(*dma_buffer))));
 
@@ -2341,7 +2309,6 @@ msm_nand_write_oob(struct mtd_info *mtd, loff_t to, struct mtd_oob_ops *ops)
 
 	ops->oobretlen = ops->ooblen - oob_len;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
 
 	if (ops->oobbuf)
@@ -2488,7 +2455,6 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 	else
 		page_count = ops->len / (mtd->writesize + mtd->oobsize);
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	wait_event(chip->wait_queue, (dma_buffer =
 			msm_nand_get_dma_buffer(chip, sizeof(*dma_buffer))));
 
@@ -2959,7 +2925,6 @@ msm_nand_write_oob_dualnandc(struct mtd_info *mtd, loff_t to,
 
 	ops->oobretlen = ops->ooblen - oob_len;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
 
 	if (ops->oobbuf)
@@ -3075,13 +3040,11 @@ msm_nand_erase(struct mtd_info *mtd, struct erase_info *instr)
 	dma_buffer->cmdptr =
 		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(
 		chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST |
 		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	/* we fail if there was an operation error, a mpu error, or the
 	 * erase success bit was not set.
@@ -3281,13 +3244,11 @@ msm_nand_erase_dualnandc(struct mtd_info *mtd, struct erase_info *instr)
 	dma_buffer->cmdptr =
 		(msm_virt_to_dma(chip, dma_buffer->cmd) >> 3) | CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(
 		chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST |
 		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	/* we fail if there was an operation error, a mpu error, or the
 	 * erase success bit was not set.
@@ -3418,12 +3379,10 @@ msm_nand_block_isbad_singlenandc(struct mtd_info *mtd, loff_t ofs)
 	dma_buffer->cmdptr = (msm_virt_to_dma(chip,
 				dma_buffer->cmd) >> 3) | CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST |
 		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	ret = 0;
 	if (dma_buffer->data.result.flash_status & 0x110)
@@ -3668,12 +3627,10 @@ msm_nand_block_isbad_dualnandc(struct mtd_info *mtd, loff_t ofs)
 	dma_buffer->cmdptr = (msm_virt_to_dma(chip,
 				dma_buffer->cmd) >> 3) | CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST |
 		DMOV_CMD_ADDR(msm_virt_to_dma(chip, &dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	ret = 0;
 	if ((dma_buffer->data.result[0].flash_status & 0x110) ||
@@ -3929,13 +3886,11 @@ uint32_t flash_onenand_probe(struct msm_nand_chip *chip)
 	dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd)
 			>> 3) | CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST
 			| DMOV_CMD_ADDR(msm_virt_to_dma(chip,
 			&dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	/* Check for errors, protection violations etc */
 	if (dma_buffer->data.status & 0x110) {
@@ -4560,13 +4515,11 @@ int msm_onenand_read_oob(struct mtd_info *mtd,
 		dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd)
 				>> 3) | CMD_PTR_LP;
 
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 		dsb();
 		msm_dmov_exec_cmd(chip->dma_channel, crci_mask,
 			DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(msm_virt_to_dma(chip,
 				&dma_buffer->cmdptr)));
 		dsb();
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 		ecc_status = (dma_buffer->data.data3 >> 16) &
 							0x0000FFFF;
@@ -5308,13 +5261,11 @@ static int msm_onenand_write_oob(struct mtd_info *mtd, loff_t to,
 		dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd)
 				>> 3) | CMD_PTR_LP;
 
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 		dsb();
 		msm_dmov_exec_cmd(chip->dma_channel, crci_mask,
 			DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(msm_virt_to_dma(chip,
 				&dma_buffer->cmdptr)));
 		dsb();
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 		ecc_status = (dma_buffer->data.data3 >> 16) & 0x0000FFFF;
 		interrupt_status = (dma_buffer->data.data4 >> 0)&0x0000FFFF;
@@ -5733,13 +5684,11 @@ static int msm_onenand_erase(struct mtd_info *mtd, struct erase_info *instr)
 	dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd)
 			>> 3) | CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST
 			| DMOV_CMD_ADDR(msm_virt_to_dma(chip,
 			&dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 	ecc_status = (dma_buffer->data.data3 >> 16) & 0x0000FFFF;
 	interrupt_status = (dma_buffer->data.data4 >> 0) & 0x0000FFFF;
@@ -6199,13 +6148,11 @@ static int msm_onenand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 		dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd)
 				>> 3) | CMD_PTR_LP;
 
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 		dsb();
 		msm_dmov_exec_cmd(chip->dma_channel, crci_mask,
 			DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(msm_virt_to_dma(chip,
 				&dma_buffer->cmdptr)));
 		dsb();
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 		write_prot_status = (dma_buffer->data.data3 >> 16) & 0x0000FFFF;
 		interrupt_status = (dma_buffer->data.data4 >> 0) & 0x0000FFFF;
@@ -6565,13 +6512,11 @@ static int msm_onenand_lock(struct mtd_info *mtd, loff_t ofs, uint64_t len)
 		dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd)
 				>> 3) | CMD_PTR_LP;
 
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 		dsb();
 		msm_dmov_exec_cmd(chip->dma_channel, crci_mask,
 			DMOV_CMD_PTR_LIST | DMOV_CMD_ADDR(msm_virt_to_dma(chip,
 				&dma_buffer->cmdptr)));
 		dsb();
-		pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 
 		write_prot_status = (dma_buffer->data.data3 >> 16) & 0x0000FFFF;
 		interrupt_status = (dma_buffer->data.data4 >> 0) & 0x0000FFFF;
@@ -6867,13 +6812,11 @@ static int msm_nand_nc10_xfr_settings(struct mtd_info *mtd)
 	dma_buffer->cmdptr = (msm_virt_to_dma(chip, dma_buffer->cmd) >> 3)
 				| CMD_PTR_LP;
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_NO_ISAPC);
 	dsb();
 	msm_dmov_exec_cmd(chip->dma_channel, crci_mask, DMOV_CMD_PTR_LIST
 			| DMOV_CMD_ADDR(msm_virt_to_dma(chip,
 			&dma_buffer->cmdptr)));
 	dsb();
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME, PM_QOS_DEFAULT_VALUE);
 	msm_nand_release_dma_buffer(chip, dma_buffer, sizeof(*dma_buffer));
 	return 0;
 }
@@ -7072,14 +7015,11 @@ MODULE_ALIAS(DRIVER_NAME);
 
 static int __init msm_nand_init(void)
 {
-	pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME,
-			       PM_QOS_DEFAULT_VALUE);
 	return platform_driver_register(&msm_nand_driver);
 }
 
 static void __exit msm_nand_exit(void)
 {
-	pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY, MODULE_NAME);
 	platform_driver_unregister(&msm_nand_driver);
 }
 

@@ -109,15 +109,12 @@ static void alarm_enqueue_locked(struct alarm *alarm)
 	struct rb_node *parent = NULL;
 	struct alarm *entry;
 	int leftmost = 1;
-	bool was_first = false;
 
 	pr_alarm(FLOW, "added alarm, type %d, func %pF at %lld\n",
 		alarm->type, alarm->function, ktime_to_ns(alarm->expires));
 
-	if (base->first == &alarm->node) {
+	if (base->first == &alarm->node)
 		base->first = rb_next(&alarm->node);
-		was_first = true;
-	}
 	if (!RB_EMPTY_NODE(&alarm->node)) {
 		rb_erase(&alarm->node, &base->alarms);
 		RB_CLEAR_NODE(&alarm->node);
@@ -137,10 +134,10 @@ static void alarm_enqueue_locked(struct alarm *alarm)
 			leftmost = 0;
 		}
 	}
-	if (leftmost)
+	if (leftmost) {
 		base->first = &alarm->node;
-	if (leftmost || was_first)
-		update_timer_locked(base, was_first);
+		update_timer_locked(base, false);
+	}
 
 	rb_link_node(&alarm->node, parent, link);
 	rb_insert_color(&alarm->node, &base->alarms);
@@ -249,13 +246,7 @@ int alarm_set_rtc(struct timespec new_time)
 	unsigned long flags;
 	struct rtc_time rtc_new_rtc_time;
 	struct timespec tmp_time;
-
-#ifdef CONFIG_RTC_TIME_MIN
-	if (new_time.tv_sec < CONFIG_RTC_TIME_MIN) {
-		pr_alarm(ERROR, "alarm_set_rtc: Invalid time\n");
-		return -EINVAL;
-	}
-#endif
+	struct timespec current_rtc_time;
 
 	rtc_time_to_tm(new_time.tv_sec, &rtc_new_rtc_time);
 
@@ -265,6 +256,8 @@ int alarm_set_rtc(struct timespec new_time)
 		rtc_new_rtc_time.tm_sec, rtc_new_rtc_time.tm_mon + 1,
 		rtc_new_rtc_time.tm_mday,
 		rtc_new_rtc_time.tm_year + 1900);
+
+	getnstimeofday(&current_rtc_time);
 
 	mutex_lock(&alarm_setrtc_mutex);
 	spin_lock_irqsave(&alarm_slock, flags);
@@ -297,9 +290,31 @@ int alarm_set_rtc(struct timespec new_time)
 		goto err;
 	}
 	ret = rtc_set_time(alarm_rtc_dev, &rtc_new_rtc_time);
-	if (ret < 0)
+	if (ret < 0) {
 		pr_alarm(ERROR, "alarm_set_rtc: "
 			"Failed to set RTC, time will be lost on reboot\n");
+
+		spin_lock_irqsave(&alarm_slock, flags);
+		for (i = 0; i < ANDROID_ALARM_SYSTEMTIME; i++) {
+			hrtimer_try_to_cancel(&alarms[i].timer);
+			alarms[i].stopped = true;
+			alarms[i].stopped_time =
+				timespec_to_ktime(current_rtc_time);
+		}
+		spin_unlock_irqrestore(&alarm_slock, flags);
+		ret = do_settimeofday(&current_rtc_time);
+		spin_lock_irqsave(&alarm_slock, flags);
+		for (i = 0; i < ANDROID_ALARM_SYSTEMTIME; i++) {
+			alarms[i].stopped = false;
+			update_timer_locked(&alarms[i], false);
+		}
+		spin_unlock_irqrestore(&alarm_slock, flags);
+		if (ret < 0)
+			goto err;
+		rtc_time_to_tm(current_rtc_time.tv_sec, &rtc_new_rtc_time);
+		ret = rtc_set_time(alarm_rtc_dev, &rtc_new_rtc_time);
+		ret = -EFAULT;
+	}
 err:
 	wake_unlock(&alarm_rtc_wake_lock);
 	mutex_unlock(&alarm_setrtc_mutex);
@@ -407,8 +422,8 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 	struct rtc_time     rtc_current_rtc_time;
 	unsigned long       rtc_current_time;
 	unsigned long       rtc_alarm_time;
+	struct timespec     rtc_current_timespec;
 	struct timespec     rtc_delta;
-	struct timespec     wall_time;
 	struct alarm_queue *wakeup_queue = NULL;
 	struct alarm_queue *tmp_queue = NULL;
 
@@ -432,11 +447,10 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 		wakeup_queue = tmp_queue;
 	if (wakeup_queue) {
 		rtc_read_time(alarm_rtc_dev, &rtc_current_rtc_time);
-		getnstimeofday(&wall_time);
-		rtc_tm_to_time(&rtc_current_rtc_time, &rtc_current_time);
-		set_normalized_timespec(&rtc_delta,
-					wall_time.tv_sec - rtc_current_time,
-					wall_time.tv_nsec);
+		rtc_current_timespec.tv_nsec = 0;
+		rtc_tm_to_time(&rtc_current_rtc_time,
+			       &rtc_current_timespec.tv_sec);
+		save_time_delta(&rtc_delta, &rtc_current_timespec);
 
 		rtc_alarm_time = timespec_sub(ktime_to_timespec(
 			hrtimer_get_expires(&wakeup_queue->timer)),

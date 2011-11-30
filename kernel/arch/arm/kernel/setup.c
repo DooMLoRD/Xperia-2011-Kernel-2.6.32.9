@@ -24,6 +24,12 @@
 #include <linux/interrupt.h>
 #include <linux/smp.h>
 #include <linux/fs.h>
+#ifdef CONFIG_KEXEC
+#include <linux/kexec.h>
+#endif
+#ifdef CONFIG_CRASH_DUMP
+#include <linux/crash_dump.h>
+#endif
 #ifdef CONFIG_MEMORY_HOTPLUG
 #include <linux/memory_hotplug.h>
 #endif
@@ -554,6 +560,46 @@ setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
 #endif
 }
 
+#if defined(CONFIG_KEXEC)
+#define CAPTURE_KERNEL_MEM_SIZE (8*1024*1024)
+static void __init
+reserve_crashkernel_mem(struct resource *res, struct membank *bank)
+{
+	unsigned long crashk_base;
+	unsigned long crashk_size;
+
+	if (crashk_res.start || !res)
+		return;
+
+	if (bank && bank->highmem)
+		return;
+
+	crashk_base = ((res->end + 1) - CAPTURE_KERNEL_MEM_SIZE)
+					& (~(SZ_2M - 1));
+	crashk_size = (res->end + 1) - crashk_base;
+
+	if (crashk_base <= 0 || crashk_size <= 0) {
+		printk(KERN_WARNING "KDUMP: crashkernel reservation failed - "
+				"invalid base address/size\n");
+		return;
+	}
+
+	if (reserve_bootmem(crashk_base, crashk_size, BOOTMEM_EXCLUSIVE)) {
+		printk(KERN_WARNING "KDUMP: reserve_bootmem failed at"
+						"0x%lx\n", crashk_base);
+		return;
+	}
+
+	printk(KERN_INFO "KDUMP: Reserved Crashk Mem at 0x%lx\n", crashk_base);
+	crashk_res.start = crashk_base;
+	crashk_res.end = crashk_base + crashk_size - 1;
+	if (request_resource(res, &crashk_res))
+		printk(KERN_WARNING "KDUMP: request_resource Failed\n");
+
+	return;
+}
+#endif
+
 static void __init
 request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 {
@@ -583,6 +629,9 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
 		if (kernel_data.start >= res->start &&
 		    kernel_data.end <= res->end)
 			request_resource(res, &kernel_data);
+#ifdef CONFIG_KEXEC
+		reserve_crashkernel_mem(res, &mi->bank[i]);
+#endif
 	}
 
 	if (mdesc->video_start) {
@@ -821,6 +870,20 @@ static int __init customize_machine(void)
 	return 0;
 }
 arch_initcall(customize_machine);
+
+#ifdef CONFIG_CRASH_DUMP
+static int __init parse_elfcorehdr(char *p)
+{
+	if (p) {
+		elfcorehdr_addr = memparse(p, &p);
+		if (reserve_bootmem(elfcorehdr_addr, 16*1024,
+					BOOTMEM_EXCLUSIVE))
+			printk(KERN_WARNING "KDUMP: reserve_mem failed\n");
+	}
+	return 1;
+}
+__setup("elfcorehdr=", parse_elfcorehdr);
+#endif
 
 void __init setup_arch(char **cmdline_p)
 {

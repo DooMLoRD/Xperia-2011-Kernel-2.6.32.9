@@ -13,6 +13,7 @@
  * of the License, or (at your option) any later version.
  */
 
+
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
@@ -182,8 +183,7 @@ static int simple_remote_attrs_set_data_buffer(char *buf, const int *array,
 	int buf_pos = 0;
 
 	for (j = 0; j < array_len; j++) {
-		buf_pos += snprintf(&buf[buf_pos], PAGE_SIZE - buf_pos,
-				"%d ", array[j]);
+		buf_pos += sprintf(&buf[buf_pos], "%d ", array[j]);
 
 		if (buf_pos >= PAGE_SIZE) {
 			pr_err("*** %s - Error! len (%d) > PAGE_SIZE\n",
@@ -590,8 +590,8 @@ static void simple_remote_close(struct input_dev *dev)
 static void simple_remote_plug_det_work(struct work_struct *work)
 {
 	u8 getgpiovalue;
-	unsigned int adc_value = 2000;
-	unsigned int alt_adc_val = 2000;
+	unsigned int adc_value = 0;
+	unsigned int alt_adc_val = 0;
 	enum dev_state state;
 
 	struct simple_remote_driver *jack =
@@ -604,34 +604,33 @@ static void simple_remote_plug_det_work(struct work_struct *work)
 	if (!getgpiovalue) {
 		jack->interface->enable_mic_bias(1);
 		jack->interface->read_hs_adc(&adc_value);
+		if ( 0 > jack->interface->enable_alternate_adc_mode(1))
+			dev_warn(jack->dev,
+				 "%s - Alternate ADC mode did not engage "
+				 "correctly. Unsupported headset may not be"
+				 "correctly detected!\n", __func__);
+		jack->interface->read_hs_adc(&alt_adc_val);
+		jack->interface->enable_mic_bias(0);
+		jack->interface->enable_alternate_adc_mode(0);
 
 		dev_dbg(jack->dev, "%s - adc_value = %d\n", __func__,
 			adc_value);
-		jack->interface->enable_mic_bias(0);
+		dev_dbg(jack->dev, "%s - alt_adc_val = %d\n", __func__,
+			alt_adc_val);
 	}
 
 	jack->new_accessory_state =
 		simple_remote_attrs_parse_accessory_type(
 			jack, adc_value, getgpiovalue);
 
+	state = simple_remote_attrs_parse_accessory_type(
+		jack, alt_adc_val, getgpiovalue);
+
 	/* performing CTIA detection */
 	if (!getgpiovalue && jack->new_accessory_state == DEVICE_HEADSET) {
 		dev_dbg(jack->dev,
 			"%s - Headset detected. Checking for unsupported\n",
 			__func__);
-		jack->interface->enable_mic_bias(1);
-		if (0 > jack->interface->enable_alternate_adc_mode(1))
-			dev_warn(jack->dev,
-				 "%s - Alternate ADC mode did not engage "
-				 "correctly. Unsupported headset may not be"
-				 "correctly detected!\n", __func__);
-		jack->interface->read_hs_adc(&alt_adc_val);
-		dev_dbg(jack->dev, "%s - alt_adc_val = %d\n", __func__,
-			alt_adc_val);
-		jack->interface->enable_mic_bias(0);
-		jack->interface->enable_alternate_adc_mode(0);
-		state = simple_remote_attrs_parse_accessory_type(
-			jack, alt_adc_val, getgpiovalue);
 		if (DEVICE_HEADPHONE == state) {
 			dev_info(jack->dev,
 				 "%s - CTIA headset detected", __func__);
@@ -642,23 +641,13 @@ static void simple_remote_plug_det_work(struct work_struct *work)
 		} else {
 			jack->num_omtp_detections++;
 		}
+		jack->num_headphone_detections = 0;
+	} else {
+		jack->num_headphone_detections++;
 	}
 
-	if (jack->new_accessory_state == DEVICE_HEADPHONE)
-		jack->num_headphone_detections++;
-	else
-		jack->num_headphone_detections = 0;
-
-	/*
-	 * Avoid the conflict between audio path changing and alternate
-	 * ADC reading.
-	 * Accessory state report to the upper layer is deferred until OMTP
-	 * detection cycle finishes when the accessory state is DEVICE_HEADSET.
-	 */
-	if (!(jack->new_accessory_state == DEVICE_HEADPHONE ||
-	    jack->new_accessory_state == DEVICE_HEADSET) ||
-	    jack->num_headphone_detections >= MIN_NUM_HEADPHONE_DETECTIONS ||
-	    jack->num_omtp_detections >= MIN_NUM_OMTP_DETECTIONS)
+	if (jack->new_accessory_state != DEVICE_HEADPHONE ||
+	    jack->num_headphone_detections >= MIN_NUM_HEADPHONE_DETECTIONS)
 		simple_remote_report_accessory_type(jack);
 
 	dev_vdbg(jack->dev, "%s - used detection cycles = %d\n", __func__,

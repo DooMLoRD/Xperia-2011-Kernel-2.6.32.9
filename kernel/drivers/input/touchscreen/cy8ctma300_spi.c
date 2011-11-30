@@ -801,15 +801,11 @@ static void cy8ctma300_new_track(struct cy8ctma300_touch *tp, int track,
 
 static void cy8ctma300_mt_handler(struct cy8ctma300_touch *tp, u8 *read_buf)
 {
-	struct spi_device *spi = tp->spi;
-	struct cypress_touch_platform_data *pdata = spi->dev.platform_data;
 	struct cy8ctma300_spi_data *cur_touch =
 		(struct cy8ctma300_spi_data *) read_buf;
 	int i = 0;
 	u8 fdetect = 0;
 	u8 report = 0;
-	int touch_major;
-	int width_major;
 
 	dev_dbg(&tp->spi->dev, "%s: start\n", __func__);
 
@@ -829,16 +825,14 @@ static void cy8ctma300_mt_handler(struct cy8ctma300_touch *tp, u8 *read_buf)
 			cy8ctma300_new_track(tp, i, cur_touch, fdetect);
 
 		if (tp->track_state[i] == TP_TRACK_DELETE) {
-			width_major = 0;
-			touch_major = 0;
+			input_report_abs(tp->input, ABS_MT_TOUCH_MAJOR, 0);
 			tp->track_state[i] = TP_TRACK_INACTIVE;
 			report = 1;
 			dev_dbg(&tp->spi->dev, "%s: MT report removed "
 						"finger\n", __func__);
 		} else if (tp->track_state[i] == TP_TRACK_ACTIVE) {
-			width_major = pdata->width_major;
-			touch_major = min((width_major * tp->mt_pos[i].z
-					   / pdata->z_max) + 1, width_major);
+			input_report_abs(tp->input, ABS_MT_TOUCH_MAJOR,
+						tp->mt_pos[i].z);
 			report = 1;
 			dev_dbg(&tp->spi->dev, "%s: MT report active finger\n",
 						__func__);
@@ -853,16 +847,7 @@ static void cy8ctma300_mt_handler(struct cy8ctma300_touch *tp, u8 *read_buf)
 						tp->mt_pos[i].x);
 			input_report_abs(tp->input, ABS_MT_POSITION_Y,
 						tp->mt_pos[i].y);
-			input_report_abs(tp->input, ABS_MT_TOUCH_MAJOR,
-						touch_major);
-			input_report_abs(tp->input, ABS_MT_WIDTH_MAJOR,
-						width_major);
 			input_mt_sync(tp->input);
-			dev_dbg(&tp->spi->dev,
-				"%s: [%d] (x, y)=(%d, %d) major=(%d / %d)\n",
-				__func__, tp->mt_pos[i].id,
-				tp->mt_pos[i].x, tp->mt_pos[i].y,
-				touch_major, width_major);
 		}
 	}
 	input_sync(tp->input);
@@ -1017,6 +1002,31 @@ done:
 	return 0;
 }
 
+static void cy8ctma300_invalidate_all_track_active(struct cy8ctma300_touch *tp)
+{
+	int i = 0;
+
+	dev_dbg(&tp->spi->dev, "%s: start\n", __func__);
+
+	for (i = 0; i < TP_TOUCH_CNT_MAX; i++) {
+		if (tp->track_state[i] == TP_TRACK_ACTIVE) {
+			tp->track_state[i] = TP_TRACK_INACTIVE;
+			input_report_abs(tp->input, ABS_MT_TOUCH_MAJOR, 0);
+			input_report_abs(tp->input, ABS_MT_TRACKING_ID,
+					tp->mt_pos[i].id);
+			input_report_abs(tp->input, ABS_MT_POSITION_X,
+					tp->mt_pos[i].x);
+			input_report_abs(tp->input, ABS_MT_POSITION_Y,
+					tp->mt_pos[i].y);
+			input_mt_sync(tp->input);
+			dev_dbg(&tp->spi->dev, "%s: ID = %d, X = %d, Y=%d\n",
+				__func__, tp->mt_pos[i].id,
+				tp->mt_pos[i].x, tp->mt_pos[i].y);
+		}
+	}
+	input_sync(tp->input);
+}
+
 static void cy8ctma300_resume_worker(struct work_struct *work)
 {
 	struct cy8ctma300_touch *tp =
@@ -1024,12 +1034,10 @@ static void cy8ctma300_resume_worker(struct work_struct *work)
 	struct spi_device *spi = tp->spi;
 	struct cypress_touch_platform_data *pdata = spi->dev.platform_data;
 	long t = msecs_to_jiffies(100);
-	int err = 0;
-	u8 fdetect = 0;
-	u8 read_buf[TOUCH_DATA_BYTES];
 
 	dev_dbg(&spi->dev, "%s: start\n", __func__);
 	mutex_lock(&tp->s_lock);
+	cy8ctma300_invalidate_all_track_active(tp);
 	dev_dbg(&spi->dev, "%s: SPI_CS wake-up sequence start\n", __func__);
 	if (!pdata->spi_cs_set)
 		goto reset;
@@ -1057,20 +1065,6 @@ static void cy8ctma300_resume_worker(struct work_struct *work)
 	cy8ctma300_setup(tp);
 	/* start command */
 	reg_write_byte(spi, TP_REG_SYS_CTRL, 0x30);
-	/* SPI sync transaction */
-	err = reg_read(spi, TP_REG_FNGR_CNT, read_buf, TOUCH_DATA_BYTES);
-	if (err) {
-		dev_err(&spi->dev, "%s: Error spi transaction\n", __func__);
-		goto done;
-	}
-	fdetect = TP_GET_FNGR_CNT(read_buf[TOUCH_DATA_FCNT]);
-	if (fdetect > TP_TOUCH_CNT_MAX) {
-		dev_err(&spi->dev, "%s: Error Invalid detected=%d\n",
-					__func__, fdetect);
-		goto done;
-	}
-	/* finger info processing */
-	cy8ctma300_mt_handler(tp, read_buf);
 	goto done;
 reset:
 	dev_err(&spi->dev, "%s: error in resuming the device\n", __func__);
@@ -1790,7 +1784,7 @@ end:
 }
 
 
-static DEVICE_ATTR(touch_cmd, S_IRUSR | S_IWUSR | S_IROTH, cy8ctma300_cmd_show,
+static DEVICE_ATTR(touch_cmd, S_IRUSR | S_IWUSR, cy8ctma300_cmd_show,
 			cy8ctma300_cmd_store);
 
 static const struct file_operations cy8ctma300_touch_fops = {
@@ -1913,8 +1907,7 @@ static int cy8ctma300_touch_probe(struct spi_device *spi)
 	/* cypressTMA300E multitouch support */
 	input_set_abs_params(dev, ABS_MT_POSITION_X, 0, pdata->x_max, 0, 0);
 	input_set_abs_params(dev, ABS_MT_POSITION_Y, 0, pdata->y_max, 0, 0);
-	input_set_abs_params(dev, ABS_MT_TOUCH_MAJOR, 0, pdata->width_major, 0, 0);
-	input_set_abs_params(dev, ABS_MT_WIDTH_MAJOR, 0, pdata->z_max, 0, 0);
+	input_set_abs_params(dev, ABS_MT_TOUCH_MAJOR, 0, pdata->z_max, 0, 0);
 
 	err = input_register_device(dev);
 	if (err)

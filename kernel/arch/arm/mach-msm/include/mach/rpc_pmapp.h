@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -47,9 +47,8 @@ enum {
 	PMAPP_CLOCK_VOTE_PIN_CTRL,
 };
 
-/* vreg ids */
+/* SMPS vreg ids */
 enum {
-	PMAPP_VREG_LDO22 = 14,
 	PMAPP_VREG_S3 = 21,
 	PMAPP_VREG_S2 = 23,
 	PMAPP_VREG_S4 = 24,
@@ -83,6 +82,5 @@ int pmapp_clock_vote(const char *voter_id, uint clock_id, uint vote);
 int pmapp_smps_clock_vote(const char *voter_id, uint vreg_id, uint vote);
 int pmapp_vreg_level_vote(const char *voter_id, uint vreg_id, uint level);
 int pmapp_smps_mode_vote(const char *voter_id, uint vreg_id, uint mode);
-int pmapp_vreg_pincntrl_vote(const char *voter_id, uint vreg_id,
-					uint clock_id, uint vote);
+
 #endif

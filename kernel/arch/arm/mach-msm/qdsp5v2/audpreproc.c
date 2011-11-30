@@ -28,7 +28,6 @@
 
 static DEFINE_MUTEX(audpreproc_lock);
 static struct wake_lock audpre_wake_lock;
-static struct wake_lock audpre_idle_wake_lock;
 
 struct msm_adspenc_info {
 	const char *module_name;
@@ -100,12 +99,10 @@ static struct audpreproc_state the_audpreproc_state = {
 static inline void prevent_suspend(void)
 {
 	wake_lock(&audpre_wake_lock);
-	wake_lock(&audpre_idle_wake_lock);
 }
 static inline void allow_suspend(void)
 {
 	wake_unlock(&audpre_wake_lock);
-	wake_unlock(&audpre_idle_wake_lock);
 }
 
 /* DSP preproc event handler */
@@ -374,8 +371,6 @@ int audpreproc_aenc_alloc(unsigned enc_type, const char **module_name,
 
 	if (!wakelock_init) {
 		wake_lock_init(&audpre_wake_lock, WAKE_LOCK_SUSPEND, "audpre");
-		wake_lock_init(&audpre_idle_wake_lock, WAKE_LOCK_IDLE,
-				"audpre_idle");
 		wakelock_init = 1;
 	}
 

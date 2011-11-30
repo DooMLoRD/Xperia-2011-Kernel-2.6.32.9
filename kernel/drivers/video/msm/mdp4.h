@@ -39,7 +39,6 @@ extern boolean mdp_is_in_isr;
 extern uint32 mdp_intr_mask;
 extern spinlock_t mdp_spin_lock;
 extern struct mdp4_statistic mdp4_stat;
-extern uint32 mdp4_extn_disp;
 
 #define MDP4_OVERLAYPROC0_BASE	0x10000
 #define MDP4_OVERLAYPROC1_BASE	0x18000
@@ -242,7 +241,6 @@ struct mdp4_overlay_pipe {
 	uint32 dst_h;		/* roi */
 	uint32 dst_x;		/* roi */
 	uint32 dst_y;		/* roi */
-	uint32 flags;
 	uint32 op_mode;
 	uint32 transp;
 	uint32 blend_op;
@@ -394,7 +392,6 @@ int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req);
 int mdp4_overlay_unset(struct fb_info *info, int ndx);
 int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 				struct file **pp_src_file);
-int mdp4_overlay_refresh(struct fb_info *info, int ndx);
 struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(int ptype, boolean usevg);
 void mdp4_overlay_pipe_free(struct mdp4_overlay_pipe *pipe);
 void mdp4_overlay_dmap_cfg(struct msm_fb_data_type *mfd, int lcdc);
@@ -438,5 +435,4 @@ void mdp_hw_cursor_init(void);
 
 int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req);
 void mdp_vsync_config_update(struct msm_panel_info *pinfo);
-void mdp4_overlay_resource_release(void);
 #endif /* MDP_H */

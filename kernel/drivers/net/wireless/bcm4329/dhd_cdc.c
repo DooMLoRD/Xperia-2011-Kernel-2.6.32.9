@@ -40,12 +40,8 @@
 #include <dhd_proto.h>
 #include <dhd_bus.h>
 #include <dhd_dbg.h>
-#ifdef CUSTOMER_HW2
-int wifi_get_mac_addr(unsigned char *buf);
-#endif
 
 extern int dhd_preinit_ioctls(dhd_pub_t *dhd);
-
 
 /* Packet alignment for most efficient SDIO (can change based on platform) */
 #ifndef DHD_SDALIGN
@@ -78,8 +74,11 @@ dhdcdc_msg(dhd_pub_t *dhd)
 {
 	dhd_prot_t *prot = dhd->prot;
 	int len = ltoh32(prot->msg.len) + sizeof(cdc_ioctl_t);
+	int ret;
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
+
+	dhd_os_wake_lock(dhd);
 
 	/* NOTE : cdc->msg.len holds the desired length of the buffer to be
 	 *        returned. Only up to CDC_MAX_MSG_SIZE of this buffer area
@@ -89,7 +88,9 @@ dhdcdc_msg(dhd_pub_t *dhd)
 		len = CDC_MAX_MSG_SIZE;
 
 	/* Send request */
-	return dhd_bus_txctl(dhd->bus, (uchar*)&prot->msg, len);
+	ret = dhd_bus_txctl(dhd->bus, (uchar*)&prot->msg, len);
+	dhd_os_wake_unlock(dhd);
+	return ret;
 }
 
 static int

@@ -5,7 +5,7 @@
  * Copyright (C) 2003-2004 Robert Schwebel, Benedikt Spranger
  * Copyright (C) 2003 Al Borchers (alborchers@steinerpoint.com)
  * Copyright (C) 2008 Nokia Corporation
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -241,7 +241,7 @@ static void rmnet_free_qmi(struct qmi_buf *qmi)
 }
 /*
  * Allocate a usb_request and its buffer.  Returns a pointer to the
- * usb_request or a error code if there is an error.
+ * usb_request or NULL if there is an error.
  */
 static struct usb_request *
 rmnet_alloc_req(struct usb_ep *ep, unsigned len, gfp_t kmalloc_flags)
@@ -859,6 +859,16 @@ static void rmnet_connect_work(struct work_struct *w)
 	wait_event(dev->smd_data.wait, test_bit(CH_OPENED,
 				&dev->smd_data.flags));
 
+	usb_ep_enable(dev->epin, ep_choose(cdev->gadget,
+				&rmnet_hs_in_desc,
+				&rmnet_fs_in_desc));
+	usb_ep_enable(dev->epout, ep_choose(cdev->gadget,
+				&rmnet_hs_out_desc,
+				&rmnet_fs_out_desc));
+	usb_ep_enable(dev->epnotify, ep_choose(cdev->gadget,
+				&rmnet_hs_notify_desc,
+				&rmnet_fs_notify_desc));
+
 	atomic_set(&dev->online, 1);
 	/* Queue Rx data requests */
 	rmnet_start_rx(dev);
@@ -872,37 +882,6 @@ static int rmnet_set_alt(struct usb_function *f,
 		unsigned intf, unsigned alt)
 {
 	struct rmnet_dev *dev = container_of(f, struct rmnet_dev, function);
-	struct usb_composite_dev *cdev = dev->cdev;
-	int ret = 0;
-
-	ret = usb_ep_enable(dev->epin, ep_choose(cdev->gadget,
-				&rmnet_hs_in_desc,
-				&rmnet_fs_in_desc));
-	if (ret) {
-		ERROR(cdev, "can't enable %s, result %d\n",
-					dev->epin->name, ret);
-		return ret;
-	}
-	ret = usb_ep_enable(dev->epout, ep_choose(cdev->gadget,
-				&rmnet_hs_out_desc,
-				&rmnet_fs_out_desc));
-	if (ret) {
-		ERROR(cdev, "can't enable %s, result %d\n",
-					dev->epout->name, ret);
-		usb_ep_disable(dev->epin);
-		return ret;
-	}
-
-	ret = usb_ep_enable(dev->epnotify, ep_choose(cdev->gadget,
-				&rmnet_hs_notify_desc,
-				&rmnet_fs_notify_desc));
-	if (ret) {
-		ERROR(cdev, "can't enable %s, result %d\n",
-					dev->epnotify->name, ret);
-		usb_ep_disable(dev->epin);
-		usb_ep_disable(dev->epout);
-		return ret;
-	}
 
 	queue_work(dev->wq, &dev->connect_work);
 	return 0;

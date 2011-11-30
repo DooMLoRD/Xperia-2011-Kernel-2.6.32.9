@@ -711,11 +711,4 @@ struct sysinfo {
 # define REBUILD_DUE_TO_FTRACE_MCOUNT_RECORD
 #endif
 
-/*
- * This value is used control if console_start is permitted
- */
-#ifdef CONFIG_CONSOLE_CONTROL
-extern unsigned long console_value;
-#endif
-
 #endif

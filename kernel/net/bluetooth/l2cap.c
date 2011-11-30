@@ -1,7 +1,6 @@
 /*
    BlueZ - Bluetooth protocol stack for Linux
    Copyright (C) 2000-2001 Qualcomm Incorporated
-   Copyright (C) 2011 Sony Ericsson Mobile Communications AB
 
    Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>
 
@@ -400,7 +399,6 @@ static void l2cap_do_start(struct sock *sk)
 
 			l2cap_send_cmd(conn, l2cap_pi(sk)->ident,
 					L2CAP_CONN_REQ, sizeof(req), &req);
-			l2cap_pi(sk)->conf_state |= L2CAP_CONF_CONNECT_REQ_SENT;
 		}
 	} else {
 		struct l2cap_info_req req;
@@ -455,7 +453,6 @@ static void l2cap_conn_start(struct l2cap_conn *conn)
 
 				l2cap_send_cmd(conn, l2cap_pi(sk)->ident,
 					L2CAP_CONN_REQ, sizeof(req), &req);
-				l2cap_pi(sk)->conf_state |= L2CAP_CONF_CONNECT_REQ_SENT;
 			}
 		} else if (sk->sk_state == BT_CONNECT2) {
 			struct l2cap_conn_rsp rsp;
@@ -2440,6 +2437,9 @@ done:
 			memset(&rfc, 0, sizeof(rfc));
 			rfc.mode = pi->mode;
 		}
+
+		if (result == L2CAP_CONF_SUCCESS)
+			pi->conf_state |= L2CAP_CONF_OUTPUT_DONE;
 	}
 	rsp->scid   = cpu_to_le16(pi->dcid);
 	rsp->result = cpu_to_le16(result);
@@ -2689,8 +2689,6 @@ static inline int l2cap_connect_rsp(struct l2cap_conn *conn, struct l2cap_cmd_hd
 		if (!sk)
 			return 0;
 	}
-
-	l2cap_pi(sk)->conf_state &= ~L2CAP_CONF_CONNECT_REQ_SENT;
 
 	switch (result) {
 	case L2CAP_CR_SUCCESS:
@@ -3759,8 +3757,7 @@ static int l2cap_security_cfm(struct hci_conn *hcon, u8 status, u8 encrypt)
 	for (sk = l->head; sk; sk = l2cap_pi(sk)->next_c) {
 		bh_lock_sock(sk);
 
-		if (l2cap_pi(sk)->conf_state &
-			(L2CAP_CONF_CONNECT_PEND | L2CAP_CONF_CONNECT_REQ_SENT)) {
+		if (l2cap_pi(sk)->conf_state & L2CAP_CONF_CONNECT_PEND) {
 			bh_unlock_sock(sk);
 			continue;
 		}
@@ -3782,7 +3779,6 @@ static int l2cap_security_cfm(struct hci_conn *hcon, u8 status, u8 encrypt)
 
 				l2cap_send_cmd(conn, l2cap_pi(sk)->ident,
 					L2CAP_CONN_REQ, sizeof(req), &req);
-				l2cap_pi(sk)->conf_state |= L2CAP_CONF_CONNECT_REQ_SENT;
 			} else {
 				l2cap_sock_clear_timer(sk);
 				l2cap_sock_set_timer(sk, HZ / 10);

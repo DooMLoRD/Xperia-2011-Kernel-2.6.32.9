@@ -313,7 +313,7 @@ static void extract_mbadrc(u32 *phy_addr, struct header *prs_hdr, u32 *index)
 					sizeof(struct header);
 		memcpy(acdb_data.mbadrc_block.ext_buf,
 				(acdb_data.virt_addr + *index +
-					sizeof(struct header)), 196*2);
+					sizeof(struct header)), 197*2);
 		MM_DBG("phy_addr = %x\n", *phy_addr);
 		*index += prs_hdr->data_len + sizeof(struct header);
 	} else if (prs_hdr->iid == IID_MBADRC_BAND_CONFIG) {
@@ -989,16 +989,18 @@ static s32 acdb_send_calibration(void)
 {
 	s32 result = 0;
 
-	if ((acdb_data.device_info->dev_type & RX_DEVICE) == 1)
+	if ((acdb_data.device_info->dev_type & RX_DEVICE) == 1) {
 		result = acdb_calibrate_audpp();
-	else if ((acdb_data.device_info->dev_type & TX_DEVICE) == 2) {
-		result = acdb_calibrate_audpreproc();
 		if (result)
 			goto done;
+	} else if ((acdb_data.device_info->dev_type & TX_DEVICE) == 2) {
+		result = acdb_calibrate_audpreproc();
 		if (acdb_data.preproc_stream_id == 1)
 			acdb_data.audrec1_applied = 1;
 		else
 			acdb_data.audrec0_applied = 1;
+		if (result)
+			goto done;
 	}
 done:
 	return result;

@@ -78,26 +78,5 @@ config SND_SOC_MSM8X60
 	help
 	 To add support for SoC audio on MSM8X60.
 
-config SND_MVS_SOC
-	tristate "SoC Mvs support for MSM7X30"
-	depends on MSM7KV2_AUDIO
-	default y
-	help
-	To support Mvs packet capture/playback
-
-config SND_MSM_MVS7x30_SOC
-	tristate "SoC MVS7x30 support for MSM7X30"
-	depends on SND_MVS_SOC
-	default y
-	help
-	To support Mvs packet capture/playback
-
-config SND_MSM_MVS_DAI_SOC
-	tristate "SoC CPU/CODEC DAI for the MSM7x30 chip"
-	depends on SND_MVS_SOC
-	default y
-	help
-	 To add support for ALSA PCM driver for MSM7x30 board.
-
 
 endmenu

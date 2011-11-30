@@ -71,18 +71,14 @@ int vsync_start_th = 1;
 int vsync_load_cnt;
 int vsync_clk_status;
 DEFINE_MUTEX(vsync_clk_lock);
-DEFINE_MUTEX(vsync_timer_lock);
 
 static struct clk *mdp_vsync_clk;
 static struct msm_fb_data_type *vsync_mfd;
-static unsigned char timer_shutdown_flag;
 
 void mdp_hw_vsync_clk_enable(struct msm_fb_data_type *mfd)
 {
-	if (vsync_clk_status == 1)
-		return;
 	mutex_lock(&vsync_clk_lock);
-	if (mfd->use_mdp_vsync) {
+	if (mfd->use_mdp_vsync && vsync_clk_status == 0) {
 		clk_enable(mdp_vsync_clk);
 		vsync_clk_status = 1;
 	}
@@ -91,10 +87,8 @@ void mdp_hw_vsync_clk_enable(struct msm_fb_data_type *mfd)
 
 void mdp_hw_vsync_clk_disable(struct msm_fb_data_type *mfd)
 {
-	if (vsync_clk_status == 0)
-		return;
 	mutex_lock(&vsync_clk_lock);
-	if (mfd->use_mdp_vsync) {
+	if (mfd->use_mdp_vsync && vsync_clk_status == 1) {
 		clk_disable(mdp_vsync_clk);
 		vsync_clk_status = 0;
 	}
@@ -106,26 +100,14 @@ void mdp_vsync_clk_enable(void)
 {
 	if (vsync_mfd) {
 		mdp_hw_vsync_clk_enable(vsync_mfd);
-		if (!vsync_mfd->vsync_resync_timer.function) {
-			mdp_set_vsync((unsigned long) vsync_mfd);
-		}
+		mdp_set_vsync((unsigned long) vsync_mfd);
 	}
 }
 
 void mdp_vsync_clk_disable(void)
 {
 	if (vsync_mfd) {
-		if (vsync_mfd->vsync_resync_timer.function) {
-			mutex_lock(&vsync_timer_lock);
-			timer_shutdown_flag = 1;
-			mutex_unlock(&vsync_timer_lock);
-			del_timer_sync(&vsync_mfd->vsync_resync_timer);
-			mutex_lock(&vsync_timer_lock);
-			timer_shutdown_flag = 0;
-			mutex_unlock(&vsync_timer_lock);
-			vsync_mfd->vsync_resync_timer.function = NULL;
-		}
-
+		del_timer(&vsync_mfd->vsync_resync_timer);
 		mdp_hw_vsync_clk_disable(vsync_mfd);
 	}
 }
@@ -138,11 +120,16 @@ static void mdp_set_vsync(unsigned long data)
 
 	pdata = (struct msm_fb_panel_data *)mfd->pdev->dev.platform_data;
 
-	vsync_mfd = mfd;
-	init_timer(&mfd->vsync_resync_timer);
-
 	if ((pdata) && (pdata->set_vsync_notifier == NULL))
 		return;
+
+	vsync_mfd = mfd;
+	init_timer(&mfd->vsync_resync_timer);
+	mfd->vsync_resync_timer.function = mdp_set_vsync;
+	mfd->vsync_resync_timer.data = data;
+	mfd->vsync_resync_timer.expires =
+	    jiffies + mfd->panel_info.lcd.vsync_notifier_period;
+	add_timer(&mfd->vsync_resync_timer);
 
 	if ((mfd->panel_info.lcd.vsync_enable) && (mfd->panel_power_on)
 	    && (!mfd->vsync_handler_pending)) {
@@ -157,16 +144,6 @@ static void mdp_set_vsync(unsigned long data)
 		     mfd->panel_info.lcd.vsync_enable, mfd->panel_power_on,
 		     mfd->vsync_handler_pending);
 	}
-
-	mutex_lock(&vsync_timer_lock);
-	if (!timer_shutdown_flag) {
-		mfd->vsync_resync_timer.function = mdp_set_vsync;
-		mfd->vsync_resync_timer.data = data;
-		mfd->vsync_resync_timer.expires =
-			jiffies + mfd->panel_info.lcd.vsync_notifier_period;
-		add_timer(&mfd->vsync_resync_timer);
-	}
-	mutex_unlock(&vsync_timer_lock);
 }
 
 static void mdp_vsync_handler(void *data)
@@ -174,8 +151,7 @@ static void mdp_vsync_handler(void *data)
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)data;
 
 	if (vsync_clk_status == 0) {
-		pr_debug("Warning: vsync clk is disabled\n");
-		mfd->vsync_handler_pending = FALSE;
+		printk(KERN_ERR "Warning: vsync clk is disabled\n");
 		return;
 	}
 
@@ -243,6 +219,7 @@ static void mdp_set_sync_cfg_1(struct msm_fb_data_type *mfd, int vsync_cnt)
 
 void mdp_config_vsync(struct msm_fb_data_type *mfd)
 {
+
 	/* vsync on primary lcd only for now */
 	if ((mfd->dest != DISPLAY_LCD) || (mfd->panel_info.pdest != DISPLAY_1)
 	    || (!vsync_mode)) {
@@ -397,7 +374,7 @@ void mdp_config_vsync(struct msm_fb_data_type *mfd)
 				}
 			}
 		}
-		mdp_hw_vsync_clk_enable(mfd);
+
 		mdp_set_vsync((unsigned long)mfd);
 	}
 
@@ -425,15 +402,9 @@ void mdp_vsync_resync_workqueue_handler(struct work_struct *work)
 			    platform_data;
 
 			if (pdata->set_vsync_notifier != NULL) {
-				if (pdata->clk_func && !pdata->clk_func(2)) {
-					mfd->vsync_handler_pending = FALSE;
-					return;
-				}
-
-				pdata->set_vsync_notifier(
-						mdp_vsync_handler,
-						(void *)mfd);
 				vsync_fnc_enabled = TRUE;
+				pdata->set_vsync_notifier(mdp_vsync_handler,
+							  (void *)mfd);
 			}
 		}
 	}

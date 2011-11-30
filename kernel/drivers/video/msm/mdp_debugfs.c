@@ -481,9 +481,7 @@ static void mddi_reg_write(int ndx, uint32 off, uint32 data)
 	else
 		base = (char *)msm_pmdh_base;
 
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	writel(data, base + off);
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 
 	printk(KERN_INFO "%s: addr=%x data=%x\n",
 			__func__, (int)(base+off), (int)data);
@@ -507,8 +505,6 @@ static int mddi_reg_read(int ndx)
 	reg = mddi_regs_list;
 	bp = debug_buf;
 	dlen = sizeof(debug_buf);
-
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	while (reg->name) {
 		data = readl((u32)base + reg->off);
 		len = snprintf(bp, dlen, "%s:0x%08x\t\t= 0x%08x\n",
@@ -518,7 +514,6 @@ static int mddi_reg_read(int ndx)
 		dlen -= len;
 		reg++;
 	}
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	*bp = 0;
 	tot++;
 

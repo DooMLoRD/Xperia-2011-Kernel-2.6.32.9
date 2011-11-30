@@ -120,11 +120,6 @@ struct adie_codec_register_image {
 
 struct adie_codec_path;
 
-struct adie_codec_anc_data {
-	u32 size;
-	u32 writes[];
-};
-
 struct adie_codec_operations {
 	int	 codec_id;
 	int (*codec_open) (struct adie_codec_dev_profile *profile,
@@ -138,8 +133,7 @@ struct adie_codec_operations {
 					u32 requested_freq);
 	int (*codec_enable_sidetone) (struct adie_codec_path *rx_path_ptr,
 					u32 enable);
-	int (*codec_enable_anc) (struct adie_codec_path *rx_path_ptr,
-		u32 enable, struct adie_codec_anc_data *calibration_writes);
+
 	int (*codec_set_device_digital_volume) (
 					struct adie_codec_path *path_ptr,
 					u32 num_channels,
@@ -163,8 +157,7 @@ int adie_codec_close(struct adie_codec_path *path_ptr);
 u32 adie_codec_freq_supported(struct adie_codec_dev_profile *profile,
 							u32 requested_freq);
 int adie_codec_enable_sidetone(struct adie_codec_path *rx_path_ptr, u32 enable);
-int adie_codec_enable_anc(struct adie_codec_path *rx_path_ptr, u32 enable,
-	struct adie_codec_anc_data *calibration_writes);
+
 int adie_codec_set_device_digital_volume(struct adie_codec_path *path_ptr,
 		u32 num_channels, u32 vol_percentage /* in percentage */);
 

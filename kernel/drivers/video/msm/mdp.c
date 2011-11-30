@@ -44,7 +44,6 @@
 #include "mdp4.h"
 #endif
 
-uint32 mdp4_extn_disp;
 static struct clk *mdp_clk;
 static struct clk *mdp_pclk;
 
@@ -85,9 +84,6 @@ struct workqueue_struct *mdp_vsync_wq;	/*mdp vsync wq */
 static struct workqueue_struct *mdp_pipe_ctrl_wq; /* mdp mdp pipe ctrl wq */
 static struct delayed_work mdp_pipe_ctrl_worker;
 
-static boolean mdp_suspended = FALSE;
-DEFINE_MUTEX(mdp_suspend_mutex);
-
 #ifdef CONFIG_FB_MSM_MDP40
 struct mdp_dma_data dma2_data;
 struct mdp_dma_data dma_s_data;
@@ -115,8 +111,8 @@ extern int first_pixel_start_y;
 struct dentry *mdp_dir;
 #endif
 
-#if defined(CONFIG_PM)
-static int mdp_suspend(struct device *dev);
+#if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND)
+static int mdp_suspend(struct platform_device *pdev, pm_message_t state);
 #else
 #define mdp_suspend NULL
 #endif
@@ -439,9 +435,6 @@ void mdp_pipe_kickoff(uint32 term, struct msm_fb_data_type *mfd)
 	}
 #endif
 }
-static int mdp_clk_rate;
-static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
-static int pdev_list_cnt;
 
 static void mdp_pipe_ctrl_workqueue_handler(struct work_struct *work)
 {
@@ -453,7 +446,7 @@ void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 	boolean mdp_all_blocks_off = TRUE;
 	int i;
 	unsigned long flag;
-	struct msm_fb_panel_data *pdata;
+
 
 	/*
 	 * It is assumed that if isr = TRUE then start = OFF
@@ -536,26 +529,13 @@ void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 		}
 
 		if ((mdp_all_blocks_off) && (mdp_current_clk_on)) {
-			mutex_lock(&mdp_suspend_mutex);
-			if (block == MDP_MASTER_BLOCK || mdp_suspended) {
+			if (block == MDP_MASTER_BLOCK) {
 				mdp_current_clk_on = FALSE;
 				/* turn off MDP clks */
 				mdp_vsync_clk_disable();
-				for (i = 0; i < pdev_list_cnt; i++) {
-					pdata = (struct msm_fb_panel_data *)
-						pdev_list[i]->dev.platform_data;
-					if (pdata && pdata->clk_func)
-						pdata->clk_func(0);
-				}
+				pmdh_clk_disable();
 				if (mdp_clk != NULL) {
-					mdp_clk_rate = clk_get_rate(mdp_clk);
 					clk_disable(mdp_clk);
-					if (mdp_hw_revision <=
-						MDP4_REVISION_V2_1 &&
-						mdp_clk_rate > 122880000) {
-						clk_set_rate(mdp_clk,
-							 122880000);
-					}
 					MSM_FB_DEBUG("MDP CLK OFF\n");
 				}
 				if (mdp_pclk != NULL) {
@@ -568,23 +548,11 @@ void mdp_pipe_ctrl(MDP_BLOCK_TYPE block, MDP_BLOCK_POWER_STATE state,
 						   &mdp_pipe_ctrl_worker,
 						   mdp_timer_duration);
 			}
-			mutex_unlock(&mdp_suspend_mutex);
 		} else if ((!mdp_all_blocks_off) && (!mdp_current_clk_on)) {
 			mdp_current_clk_on = TRUE;
 			/* turn on MDP clks */
-			for (i = 0; i < pdev_list_cnt; i++) {
-				pdata = (struct msm_fb_panel_data *)
-					pdev_list[i]->dev.platform_data;
-				if (pdata && pdata->clk_func)
-					pdata->clk_func(1);
-			}
+			pmdh_clk_enable();
 			if (mdp_clk != NULL) {
-				if (mdp_hw_revision <=
-					MDP4_REVISION_V2_1 &&
-					mdp_clk_rate > 122880000) {
-					clk_set_rate(mdp_clk,
-						 mdp_clk_rate);
-				}
 				clk_enable(mdp_clk);
 				MSM_FB_DEBUG("MDP CLK ON\n");
 			}
@@ -756,7 +724,6 @@ static void mdp_drv_init(void)
 	init_completion(&dma2_data.comp);
 	init_MUTEX(&dma2_data.mutex);
 	sema_init(&dma2_data.ov_sem,1);
-	init_MUTEX(&dma2_data.pending_pipe_sem);
 
 	dma3_data.busy = FALSE;
 	dma3_data.waiting = FALSE;
@@ -839,15 +806,16 @@ static int mdp_runtime_resume(struct device *dev)
 static struct dev_pm_ops mdp_dev_pm_ops = {
 	.runtime_suspend = mdp_runtime_suspend,
 	.runtime_resume = mdp_runtime_resume,
-#if defined(CONFIG_PM)
-	.suspend = mdp_suspend,
-#endif
 };
 
 
 static struct platform_driver mdp_driver = {
 .probe = mdp_probe,
 	.remove = mdp_remove,
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.suspend = mdp_suspend,
+	.resume = NULL,
+#endif
 	.shutdown = NULL,
 	.driver = {
 		/*
@@ -863,23 +831,39 @@ static int mdp_off(struct platform_device *pdev)
 {
 	int ret = 0;
 
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+#ifdef MDP_HW_VSYNC
+	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
+#endif
+
 	ret = panel_next_off(pdev);
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+
+#ifdef MDP_HW_VSYNC
+	mdp_hw_vsync_clk_disable(mfd);
+#endif
 
 	return ret;
 }
 
 static int mdp_on(struct platform_device *pdev)
 {
+#ifdef MDP_HW_VSYNC
+	struct msm_fb_data_type *mfd = platform_get_drvdata(pdev);
+#endif
+
 	int ret = 0;
 
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+#ifdef MDP_HW_VSYNC
+	mdp_hw_vsync_clk_enable(mfd);
+#endif
+
 	ret = panel_next_on(pdev);
-	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+
 	return ret;
 }
 
+
+static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
+static int pdev_list_cnt;
 static int mdp_resource_initialized;
 static struct msm_panel_common_pdata *mdp_pdata;
 
@@ -917,40 +901,12 @@ void mdp_hw_version(void)
 	mdp_hw_revision >>= 28;	/* bit 31:28 */
 	mdp_hw_revision &= 0x0f;
 
-#ifdef CONFIG_FB_MSM_MSM2_1_DISABLE
 	/* Disabled MSM2.1 activation */
 	if (mdp_hw_revision >= MDP4_REVISION_V2_1)
 		mdp_hw_revision = MDP4_REVISION_V2;
-#endif
 
 	printk(KERN_INFO "%s: mdp_hw_revision=%x\n",
 				__func__, mdp_hw_revision);
-}
-
-DEFINE_MUTEX(mdp_clk_lock);
-int mdp_set_core_clk(uint16 perf_level)
-{
-	int ret = -EINVAL;
-	if (mdp_clk && mdp_pdata
-		 && mdp_pdata->mdp_core_clk_table) {
-		if (perf_level > mdp_pdata->num_mdp_clk)
-			printk(KERN_ERR "%s invalid perf level\n", __func__);
-		else {
-			mutex_lock(&mdp_clk_lock);
-			if (mdp4_extn_disp)
-				perf_level = 1;
-			ret = clk_set_rate(mdp_clk,
-				mdp_pdata->
-				mdp_core_clk_table[mdp_pdata->num_mdp_clk
-						 - perf_level]);
-			mutex_unlock(&mdp_clk_lock);
-			if (ret) {
-				printk(KERN_ERR "%s unable to set mdp_core_clk rate\n",
-					__func__);
-			}
-		}
-	}
-	return ret;
 }
 
 static int mdp_irq_clk_setup(void)
@@ -1239,7 +1195,6 @@ static int mdp_probe(struct platform_device *pdev)
 
 
 	pdev_list[pdev_list_cnt++] = pdev;
-	mdp4_extn_disp = 0;
 	return 0;
 
       mdp_probe_err:
@@ -1262,25 +1217,13 @@ static void mdp_suspend_sub(void)
 
 	/* try to power down */
 	mdp_pipe_ctrl(MDP_MASTER_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
-
-	mutex_lock(&mdp_suspend_mutex);
-	mdp_suspended = TRUE;
-	mutex_unlock(&mdp_suspend_mutex);
 }
+#endif
 
-static int mdp_suspend(struct device *dev)
+#if defined(CONFIG_PM) && !defined(CONFIG_HAS_EARLYSUSPEND)
+static int mdp_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	struct platform_device *pdev = container_of(dev,
-		struct platform_device, dev);
-
-	if (pdev->id == 0) {
-		mdp_suspend_sub();
-		if (mdp_current_clk_on) {
-			printk(KERN_WARNING"MDP suspend failed\n");
-			return -EBUSY;
-		}
-	}
-
+	mdp_suspend_sub();
 	return 0;
 }
 #endif
@@ -1289,13 +1232,6 @@ static int mdp_suspend(struct device *dev)
 static void mdp_early_suspend(struct early_suspend *h)
 {
 	mdp_suspend_sub();
-}
-
-static void mdp_early_resume(struct early_suspend *h)
-{
-	mutex_lock(&mdp_suspend_mutex);
-	mdp_suspended = FALSE;
-	mutex_unlock(&mdp_suspend_mutex);
 }
 #endif
 
@@ -1311,7 +1247,6 @@ static int mdp_register_driver(void)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 1;
 	early_suspend.suspend = mdp_early_suspend;
-	early_suspend.resume = mdp_early_resume;
 	register_early_suspend(&early_suspend);
 #endif
 

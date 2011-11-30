@@ -217,6 +217,18 @@ int _remote_spin_lock_init(remote_spinlock_id_t id, _remote_spinlock_t *lock)
 #define _remote_spin_trylock(lock)	__raw_remote_ex_spin_trylock(*lock)
 #endif
 
+/* In KDUMP Capture Kernel , we can not use Remote spinlocks
+ * As the AMSS software has aready crashed
+ */
+#ifdef CONFIG_CRASH_DUMP
+#undef _remote_spin_lock
+#undef _remote_spin_unlock
+#undef _remote_spin_trylock
+#define _remote_spin_lock(lock) ({})
+#define _remote_spin_unlock(lock) ({})
+#define _remote_spin_trylock(lock) (1)
+#endif
+
 /* Remote mutex definitions. */
 
 typedef struct {

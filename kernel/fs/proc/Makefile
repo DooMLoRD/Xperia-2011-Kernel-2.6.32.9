@@ -4,6 +4,10 @@
 
 obj-$(CONFIG_PROC_FS) += proc.o
 
+ifeq ($(CONFIG_ARM), y)
+CFLAGS_REMOVE_vmcore.o = -Werror
+endif
+
 proc-y			:= nommu.o task_nommu.o
 proc-$(CONFIG_MMU)	:= mmu.o task_mmu.o
 

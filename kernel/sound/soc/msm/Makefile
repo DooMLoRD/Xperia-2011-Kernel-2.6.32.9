@@ -35,14 +35,3 @@ obj-$(CONFIG_SND_SOC_MSM8X60_PCM) += snd-soc-msm8x60-pcm.o
 snd-soc-msm8x60-objs := msm8x60.o
 obj-$(CONFIG_SND_SOC_MSM8X60) += snd-soc-msm8x60.o
 
-
-#MVS Support
-snd-soc-msm-mvs-dai-objs := mvs-dai.o
-obj-$(CONFIG_SND_MSM_MVS_DAI_SOC) += snd-soc-msm-mvs-dai.o
-
-snd-soc-msm-mvs-objs := msm-mvs.o
-obj-$(CONFIG_SND_MVS_SOC) += snd-soc-msm-mvs.o
-
-snd-soc-mvs7x30-objs := mvs7x30.o
-obj-$(CONFIG_SND_MSM_MVS7x30_SOC) += snd-soc-mvs7x30.o
-

@@ -449,6 +449,12 @@ void mddi_host_timer_service(unsigned long data)
 
 	unsigned long time_ms = MDDI_DEFAULT_TIMER_LENGTH;
 	init_timer(&mddi_host_timer);
+	mddi_host_timer.function = mddi_host_timer_service;
+	mddi_host_timer.data = 0;
+
+	mddi_host_timer.expires = jiffies + ((time_ms * HZ) / 1000);
+	add_timer(&mddi_host_timer);
+
 	for (host_idx = MDDI_HOST_PRIM; host_idx < MDDI_NUM_HOST_CORES;
 	     host_idx++) {
 		pmhctl = &(mhctl[host_idx]);
@@ -618,15 +624,6 @@ void mddi_host_timer_service(unsigned long data)
 	}
 	if (mddi_log_stats_counter >= mddi_log_stats_frequency)
 		mddi_log_stats_counter = 0;
-
-	mutex_lock(&mddi_timer_lock);
-	if (!mddi_timer_shutdown_flag) {
-		mddi_host_timer.function = mddi_host_timer_service;
-		mddi_host_timer.data = 0;
-		mddi_host_timer.expires = jiffies + ((time_ms * HZ) / 1000);
-		add_timer(&mddi_host_timer);
-	}
-	mutex_unlock(&mddi_timer_lock);
 
 	return;
 }				/* mddi_host_timer_cb */
@@ -1079,8 +1076,6 @@ static void mddi_process_rev_packets(void)
 				if (mddi_enable_reg_read_retry_once)
 					mddi_reg_read_retry =
 					    mddi_reg_read_retry_max;
-				else
-					mddi_reg_read_retry++;
 				pmhctl->rev_state = MDDI_REV_REG_READ_SENT;
 				pmhctl->stats.reg_read_failure++;
 			} else {
@@ -1584,10 +1579,8 @@ void mddi_host_configure_interrupts(mddi_host_type host_idx, boolean enable)
 			     "PMDH", 0) != 0)
 				printk(KERN_ERR
 				       "a mddi: unable to request_irq\n");
-			else {
+			else
 				int_mddi_pri_flag = TRUE;
-				irq_enabled = 1;
-			}
 		} else {
 			if (request_irq
 			    (INT_MDDI_EXT, mddi_emdh_isr_proxy, IRQF_DISABLED,

@@ -37,28 +37,7 @@
 #include <mach/qdsp5v2/marimba_profile_anzu.h>
 #elif defined(CONFIG_MACH_SEMC_HALLON)
 #include <mach/qdsp5v2/marimba_profile_hallon.h>
-#elif defined(CONFIG_MACH_SEMC_IYOKAN)
-#include <mach/qdsp5v2/marimba_profile_iyokan.h>
-#elif defined(CONFIG_MACH_SEMC_URUSHI)
-#include <mach/qdsp5v2/marimba_profile_urushi.h>
-#elif defined(CONFIG_MACH_SEMC_SMULTRON)
-#include <mach/qdsp5v2/marimba_profile_smultron.h>
-#elif defined(CONFIG_MACH_SEMC_SATSUMA)
-#include <mach/qdsp5v2/marimba_profile_satsuma.h>
-#elif defined(CONFIG_MACH_SEMC_MANGO)
-#include <mach/qdsp5v2/marimba_profile_mango.h>
-#elif defined(CONFIG_MACH_SEMC_AKANE)
-#include <mach/qdsp5v2/marimba_profile_akane.h>
-#elif defined(CONFIG_MACH_SEMC_AZUSA)
-#include <mach/qdsp5v2/marimba_profile_azusa.h>
-#elif defined(CONFIG_MACH_SEMC_AYAME)
-#include <mach/qdsp5v2/marimba_profile_ayame.h>
-#elif defined(CONFIG_MACH_SEMC_HAIDA)
-#include <mach/qdsp5v2/marimba_profile_hallon.h>
-#else
-#include <mach/qdsp5v2/marimba_profile_mogami.h>
 #endif
-
 /***************************************************************************\
 				Platform Device Profiles
 \***************************************************************************/
@@ -194,12 +173,11 @@
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x24, 0x6F, 0x64)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x25, 0x0F, 0x0B)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x26, 0xfc, 0xfc)}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x38, 0xff, 0x02)}, \
+	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x38, 0xff, 0x82)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x3A, 0xFF, 0xab)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x83, 0x23, 0x23)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x33, 0x80, 0x82)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x34, 0xf0, 0xf0)}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x38, 0xff, 0x82)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x23, 0xff, 0x20)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x3B, 0xFF, 0x10)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x3c, 0xFF, 0x10)}, \
@@ -210,7 +188,6 @@
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x8a, 0x03, 0x03)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x3b, 0xFF, 0xAC)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x3c, 0xFF, 0xAC)}, \
-	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x38, 0xff, 0x02)}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x34, 0xf0, 0x00)}, \
 	{ADIE_CODEC_ACTION_STAGE_REACHED, ADIE_CODEC_ANALOG_OFF}, \
 	{ADIE_CODEC_ACTION_ENTRY, ADIE_CODEC_PACK_ENTRY(0x33, 0x80, 0x00)}, \

@@ -3,7 +3,6 @@
  * Copyright (C) 2008 Google, Inc.
  * Copyright (C) 2008 HTC Corporation
  * Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
- * Copyright (C) 2010 Sony Ericsson Mobile Communications AB
  *
  * Derived from msm-pcm.c and msm7201.c.
  *
@@ -37,6 +36,7 @@ struct snd_soc_dai msm_dais[] = {
 	.name = "CODEC_DAI",
 	.playback = {
 		.stream_name = "Playback",
+		.channels_min = USE_CHANNELS_MIN,
 		.channels_max = USE_CHANNELS_MAX,
 		.rates = USE_RATE,
 		.rate_min = USE_RATE_MIN,
@@ -45,6 +45,7 @@ struct snd_soc_dai msm_dais[] = {
 	},
 	.capture = {
 		.stream_name = "Capture",
+		.channels_min = USE_CHANNELS_MIN,
 		.channels_max = USE_CHANNELS_MAX,
 		.rate_min = USE_RATE_MIN,
 		.rates = USE_RATE,
@@ -80,7 +81,7 @@ int msm_pcm_probe(struct platform_device *devptr)
 
 	struct snd_soc_device *socdev = platform_get_drvdata(devptr);
 
-	printk(KERN_INFO "msm_soc: create pcms\n");
+	printk(KERN_ERR "msm_soc: create pcms\n");
 	codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
 	if (codec == NULL)
 		return -ENOMEM;

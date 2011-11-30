@@ -52,15 +52,6 @@ config RTC_HCTOSYS_DEVICE
 	  sleep states. Do not specify an RTC here unless it stays powered
 	  during all this system's supported sleep states.
 
-config RTC_TIME_MIN
-	int "Min supported RTC time"
-	depends on RTC_CLASS = y
-	default 315532800 if RTC_DRV_MSM
-	default 0
-	help
-	  The earliest time supported by the RTC in seconds since
-	  01-01-1970 00:00:00.
-
 config RTC_DEBUG
 	bool "RTC debug support"
 	depends on RTC_CLASS = y

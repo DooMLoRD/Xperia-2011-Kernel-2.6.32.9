@@ -53,35 +53,12 @@ enum cyttsp_gen {
  * if set to 0, then all gesture movements are reported
  * Valid range is 0 - 15
  */
-enum cyttsp_act_dist {
-	CY_ACT_DIST_KEEP_ASIS = -1,
-	CY_ACT_DIST_CLR = 0xf0,
-	CY_ACT_DIST_00 = 0,
-	CY_ACT_DIST_01 = 1,
-	CY_ACT_DIST_02 = 2,
-	CY_ACT_DIST_03 = 3,
-	CY_ACT_DIST_04 = 4,
-	CY_ACT_DIST_05 = 5,
-	CY_ACT_DIST_06 = 6,
-	CY_ACT_DIST_07 = 7,
-	CY_ACT_DIST_08 = 8,
-	CY_ACT_DIST_09 = 9,
-	CY_ACT_DIST_10 = 10,
-	CY_ACT_DIST_11 = 11,
-	CY_ACT_DIST_12 = 12,
-	CY_ACT_DIST_13 = 13,
-	CY_ACT_DIST_14 = 14,
-	CY_ACT_DIST_15 = 15,
-	CY_ACT_DIST_DFLT = CY_ACT_DIST_08,
-	CY_ACT_DIST = CY_ACT_DIST_DFLT,
-};
-
+#define CY_ACT_DIST_DFLT 8
+#define CY_ACT_DIST CY_ACT_DIST_DFLT
 /* max num retries to read touch data */
-#define CY_NUM_RETRY 100
+#define CY_NUM_RETRY 4
 
 enum cyttsp_gest {
-	CY_GEST_KEEP_ASIS = -1,
-	CY_GEST_GRP_CLR = 0x0f,
 	CY_GEST_GRP_NONE = 0,
 	CY_GEST_GRP1 =	0x10,
 	CY_GEST_GRP2 = 0x20,
@@ -94,7 +71,6 @@ enum cyttsp_powerstate {
 	CY_ACTIVE_STATE,
 	CY_LOW_PWR_STATE,
 	CY_SLEEP_STATE,
-	CY_UNSURE_STATE,
 };
 
 struct cyttsp_platform_data {
@@ -114,14 +90,12 @@ struct cyttsp_platform_data {
 	unsigned use_force_fw_update:1;
 	unsigned use_virtual_keys:1;
 	enum cyttsp_powerstate power_state;
-	enum cyttsp_gest gest_set;
-	enum cyttsp_act_dist act_dist;
+	u8 gest_set;
 	u8 act_intrvl;  /* Active refresh interval; ms */
 	u8 tch_tmout;   /* Active touch timeout; ms */
 	u8 lp_intrvl;   /* Low power refresh interval; ms */
 	int (*wakeup)(void);
 	int (*init)(int on_off);
-	int (*reset)(void);
 	void (*mt_sync)(struct input_dev *);
 	int (*cust_spec)(u8 data[], int size);
 	char *name;

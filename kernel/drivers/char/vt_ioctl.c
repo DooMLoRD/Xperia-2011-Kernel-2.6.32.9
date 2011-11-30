@@ -184,7 +184,6 @@ int vt_waitactive(int n)
 
 	do {
 		vw.event.event = VT_EVENT_SWITCH;
-		vw.done = 0;
 		spin_lock_irqsave(&vt_event_lock, flags);
 		list_add(&vw.list, &vt_events);
 		spin_unlock_irqrestore(&vt_event_lock, flags);

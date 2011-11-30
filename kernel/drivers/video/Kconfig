@@ -2189,11 +2189,6 @@ config FB_MSM_MDP40
 	  Say Y here if this is msm7x30 variant platform.
 endchoice
 
-config FB_MSM_MSM2_1_DISABLE
-	depends on FB_MSM_MDP40
-	bool "MSM2.1 HW fix disable"
-	default n
-
 config FB_MSM_EBI2
 	bool
 	default n
@@ -2222,11 +2217,6 @@ config FB_MSM_DTV
 
 config FB_MSM_PANEL_ESD
 	bool "PANEL ESD support"
-	default n
-
-config FB_MSM_MDDI_LCD_WINDOW_ADJUST
-	depends on FB_MSM_MDDI
-	bool "MSM MDDI LCD windows adjust"
 	default n
 
 config FB_MSM_MDDI_NOVATEK_DISABLE_MDDI
@@ -2406,22 +2396,6 @@ config FB_MSM_MDDI_HITACHI_HVGA_LCD
 	---help---
 	  Support for Hitachi HVGA MDDI LCD Panel (320x480)
 
-config FB_MSM_MDDI_SII_HVGA_LCD
-	depends on FB_MSM
-	bool "MDDI Sii HVGA LCD Panel"
-	select FB_MSM_MDDI
-	default n
-	---help---
-	  Support for Sii HVGA MDDI LCD Panel (320x480)
-
-config FB_MSM_MDDI_AUO_HVGA_LCD
-	depends on FB_MSM
-	bool "MDDI Auo HVGA LCD Panel"
-	select FB_MSM_MDDI
-	default n
-	---help---
-	  Support for Auo HVGA MDDI LCD Panel (320x480)
-
 config FB_MSM_MDDI_NOVATEK_FWVGA
 	bool "MDDI Novatek FWVGA panel"
 	select FB_MSM_MDDI
@@ -2506,22 +2480,6 @@ config MDDI_NOVATEK_PANEL_HITACHI_DX09D09VM
 	default n
 	---help---
 	  Support for HITACHI_DX09D09VM panel connected
-	  to the MDDI Novatek micro controller
-
-config MDDI_NOVATEK_PANEL_SHARP_LS033T3LX01
-	depends on FB_MSM_MDDI_NOVATEK_FWVGA
-	bool "SHARP LS033T3LX01 Panel"
-	default n
-	---help---
-	  Support for SHARP_LS033T3LX01 panel connected
-	  to the MDDI Novatek micro controller
-
-config MDDI_NOVATEK_PANEL_TMD_LT033MDV1000
-	depends on FB_MSM_MDDI_NOVATEK_FWVGA
-	bool "TMD LT033MDV1000 Panel"
-	default n
-	---help---
-	  Support for TMD_LT033MDV1000 panel connected
 	  to the MDDI Novatek micro controller
 
 choice

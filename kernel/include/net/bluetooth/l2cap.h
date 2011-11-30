@@ -1,7 +1,6 @@
 /* 
    BlueZ - Bluetooth protocol stack for Linux
    Copyright (C) 2000-2001 Qualcomm Incorporated
-   Copyright (C) 2011 Sony Ericsson Mobile Communications AB
 
    Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>
 
@@ -359,15 +358,14 @@ struct l2cap_pinfo {
 	struct sock		*prev_c;
 };
 
-#define L2CAP_CONF_REQ_SENT         0x01
-#define L2CAP_CONF_INPUT_DONE       0x02
-#define L2CAP_CONF_MTU_DONE         0x04
-#define L2CAP_CONF_MODE_DONE        0x08
-#define L2CAP_CONF_OUTPUT_DONE      (L2CAP_CONF_MTU_DONE | L2CAP_CONF_MODE_DONE)
-#define L2CAP_CONF_CONNECT_REQ_SENT 0x10
-#define L2CAP_CONF_CONNECT_PEND     0x20
-#define L2CAP_CONF_NO_FCS_RECV      0x40
-#define L2CAP_CONF_STATE2_DEVICE    0x80
+#define L2CAP_CONF_REQ_SENT       0x01
+#define L2CAP_CONF_INPUT_DONE     0x02
+#define L2CAP_CONF_OUTPUT_DONE    0x04
+#define L2CAP_CONF_MTU_DONE       0x08
+#define L2CAP_CONF_MODE_DONE      0x10
+#define L2CAP_CONF_CONNECT_PEND   0x20
+#define L2CAP_CONF_NO_FCS_RECV    0x40
+#define L2CAP_CONF_STATE2_DEVICE  0x80
 
 #define L2CAP_CONF_MAX_CONF_REQ 2
 #define L2CAP_CONF_MAX_CONF_RSP 2

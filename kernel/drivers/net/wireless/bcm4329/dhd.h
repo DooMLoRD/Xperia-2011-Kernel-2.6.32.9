@@ -24,7 +24,7 @@
  * software in any way with any other Broadcom software provided under a license
  * other than the GPL, without Broadcom's express prior written consent.
  *
- * $Id: dhd.h,v 1.32.4.7.2.4.14.49.4.9 2011-01-14 22:40:45 Exp $
+ * $Id: dhd.h,v 1.32.4.7.2.4.14.49 2010/08/20 17:32:48 Exp $
  */
 
 /****************
@@ -35,9 +35,6 @@
 #define _dhd_h_
 
 #if defined(LINUX)
-#if defined(CHROMIUMOS_COMPAT_WIRELESS)
-#include <linux/sched.h>
-#endif
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -49,9 +46,7 @@
 #include <linux/ethtool.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
-#include <linux/wakelock.h>
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
+
 /* The kernel threading is sdio-specific */
 #else /* LINUX */
 #define ENOMEM		1
@@ -64,6 +59,11 @@
 
 #include <wlioctl.h>
 
+#ifdef DHD_DEBUG
+#ifndef DHD_DEBUG_TRAP
+#define DHD_DEBUG_TRAP
+#endif
+#endif
 
 /* Forward decls */
 struct dhd_bus;
@@ -86,11 +86,9 @@ enum dhd_bus_wake_state {
 	WAKE_LOCK_TMOUT,
 	WAKE_LOCK_WATCHDOG,
 	WAKE_LOCK_LINK_DOWN_TMOUT,
-	WAKE_LOCK_PNO_FIND_TMOUT,
 	WAKE_LOCK_SOFTAP_SET,
 	WAKE_LOCK_SOFTAP_STOP,
 	WAKE_LOCK_SOFTAP_START,
-	WAKE_LOCK_SOFTAP_THREAD,
 	WAKE_LOCK_MAX
 };
 enum dhd_prealloc_index {
@@ -164,18 +162,10 @@ typedef struct dhd_pub {
 	char * pktfilter[100];
 	int pktfilter_count;
 
-	wl_country_t dhd_cspec;		/* Current Locale info */
+	uint8 country_code[WLC_CNTRY_BUF_SZ];
 	char eventmask[WL_EVENTING_MASK_LEN];
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
-	struct wake_lock	wakelock[WAKE_LOCK_MAX];
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	struct mutex	wl_start_stop_lock; /* lock/unlock for Android start/stop */
-	struct mutex	wl_softap_lock;		 /* lock/unlock for any SoftAP/STA settings */
-#endif
 } dhd_pub_t;
-
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP)
 
@@ -184,7 +174,7 @@ typedef struct dhd_pub {
 			int retry = 0; \
 			smp_mb(); \
 			while (dhd_mmc_suspend && retry++ != b) { \
-				wait_event_timeout(a, FALSE, HZ/100); \
+				wait_event_interruptible_timeout(a, FALSE, HZ/100); \
 			} \
 		} 	while (0)
 	#define DHD_PM_RESUME_WAIT(a) 		_DHD_PM_RESUME_WAIT(a, 30)
@@ -196,7 +186,7 @@ typedef struct dhd_pub {
 	#define SPINWAIT_SLEEP(a, exp, us) do { \
 		uint countdown = (us) + 9999; \
 		while ((exp) && (countdown >= 10000)) { \
-			wait_event_timeout(a, FALSE, HZ/100); \
+			wait_event_interruptible_timeout(a, FALSE, HZ/100); \
 			countdown -= 10000; \
 		} \
 	} while (0)
@@ -219,110 +209,14 @@ typedef struct dhd_pub {
 	} while (0)
 
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_PM_SLEEP) */
+
 #define DHD_IF_VIF	0x01	/* Virtual IF (Hidden from user) */
 
-inline static void NETIF_ADDR_LOCK(struct net_device *dev)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 29))
-	netif_addr_lock_bh(dev);
-#endif
-}
-
-inline static void NETIF_ADDR_UNLOCK(struct net_device *dev)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 29))
-	netif_addr_unlock_bh(dev);
-#endif
-}
-
-inline static void MUTEX_LOCK_INIT(dhd_pub_t * dhdp)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	mutex_init(&dhdp->wl_start_stop_lock);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
-}
-
-inline static void MUTEX_LOCK_SOFTAP_SET_INIT(dhd_pub_t * dhdp)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	mutex_init(&dhdp->wl_softap_lock);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
-}
-
-inline static void MUTEX_LOCK_SOFTAP_SET(dhd_pub_t * dhdp)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	mutex_lock(&dhdp->wl_softap_lock);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
-}
-
-inline static void MUTEX_UNLOCK_SOFTAP_SET(dhd_pub_t * dhdp)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	mutex_unlock(&dhdp->wl_softap_lock);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
-}
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-extern struct mutex  g_wl_ss_scan_lock;		 /* lock/unlock for Scan/Cache settings */
-#endif
-
-inline static void MUTEX_LOCK_WL_SCAN_SET_INIT(void)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	mutex_init(&g_wl_ss_scan_lock);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
-}
-
-inline static void MUTEX_LOCK_WL_SCAN_SET(void)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	mutex_lock(&g_wl_ss_scan_lock);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
-}
-
-inline static void MUTEX_UNLOCK_WL_SCAN_SET(void)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-	mutex_unlock(&g_wl_ss_scan_lock);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) */
-}
-
-inline static void WAKE_LOCK_INIT(dhd_pub_t * dhdp, int index, char * y)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
-	wake_lock_init(&dhdp->wakelock[index], WAKE_LOCK_SUSPEND, y);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
-}
-
-inline static void WAKE_LOCK(dhd_pub_t * dhdp, int index)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
-	wake_lock(&dhdp->wakelock[index]);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
-}
-
-inline static void WAKE_UNLOCK(dhd_pub_t * dhdp, int index)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
-	wake_unlock(&dhdp->wakelock[index]);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
-}
-
-inline static void WAKE_LOCK_TIMEOUT(dhd_pub_t * dhdp, int index, long time)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
-	wake_lock_timeout(&dhdp->wakelock[index], time);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
-}
-
-inline static void WAKE_LOCK_DESTROY(dhd_pub_t * dhdp, int index)
-{
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined(CONFIG_HAS_WAKELOCK)
-	wake_lock_destroy(&dhdp->wakelock[index]);
-#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)) && defined (CONFIG_HAS_WAKELOCK) */
-}
-
+/* Wakelock Functions */
+extern int dhd_os_wake_lock(dhd_pub_t *pub);
+extern int dhd_os_wake_unlock(dhd_pub_t *pub);
+extern int dhd_os_wake_lock_timeout(dhd_pub_t *pub);
+extern int dhd_os_wake_lock_timeout_enable(dhd_pub_t *pub);
 
 typedef struct dhd_if_event {
 	uint8 ifidx;
@@ -331,12 +225,6 @@ typedef struct dhd_if_event {
 	uint8 bssidx;
 } dhd_if_event_t;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)) && 1
-extern void dhd_os_start_lock(dhd_pub_t *pub);
-extern void dhd_os_start_unlock(dhd_pub_t *pub);
-#endif
-extern unsigned long dhd_os_spin_lock(dhd_pub_t *pub);
-extern void dhd_os_spin_unlock(dhd_pub_t *pub, unsigned long flags);
 /*
  * Exported from dhd OS modules (dhd_linux/dhd_ndis)
  */
@@ -459,7 +347,6 @@ typedef enum cust_gpio_modes {
 } cust_gpio_modes_t;
 extern int wl_iw_iscan_set_scan_broadcast_prep(struct net_device *dev, uint flag);
 extern int wl_iw_send_priv_event(struct net_device *dev, char *flag);
-extern int net_os_send_hang_message(struct net_device *dev);
 /*
  * Insmod parameters for debug/test
  */
@@ -509,10 +396,6 @@ extern uint dhd_sdiod_drive_strength;
 /* Override to force tx queueing all the time */
 extern uint dhd_force_tx_queueing;
 
-/* Default KEEP_ALIVE Period is 30 sec to prevent AP from sending Keep Alive probe frame */
-#define KEEP_ALIVE_PERIOD 30000
-#define NULL_PKT_STR	"null_pkt"
-
 #ifdef SDTEST
 /* Echo packet generator (SDIO), pkts/s */
 extern uint dhd_pktgen;
@@ -536,11 +419,5 @@ extern char nv_path[MOD_PARAM_PATHLEN];
 
 extern void dhd_wait_for_event(dhd_pub_t *dhd, bool *lockvar);
 extern void dhd_wait_event_wakeup(dhd_pub_t*dhd);
-
-/* dhd_commn arp offload wrapers */
-void dhd_aoe_hostip_clr(dhd_pub_t *dhd);
-void dhd_aoe_arp_clr(dhd_pub_t *dhd);
-int dhd_arp_get_arp_hostip_table(dhd_pub_t *dhd, void *buf, int buflen);
-void dhd_arp_offload_add_ip(dhd_pub_t *dhd, u32 ipaddr);
 
 #endif /* _dhd_h_ */

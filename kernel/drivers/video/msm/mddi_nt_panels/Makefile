@@ -5,8 +5,6 @@ obj-$(CONFIG_MDDI_NOVATEK_PANEL_SONY_ACX424AKM) += mddi_nt_sony_acx424akm.o
 obj-$(CONFIG_MDDI_NOVATEK_PANEL_SONY_ACX427AK) += mddi_nt_sony_acx427ak.o
 obj-$(CONFIG_MDDI_NOVATEK_PANEL_SONY_ACX424AK) += mddi_nt_sony_acx424ak.o
 obj-$(CONFIG_MDDI_NOVATEK_PANEL_HITACHI_DX09D09VM) += mddi_nt_hitachi_dx09d09vm.o
-obj-$(CONFIG_MDDI_NOVATEK_PANEL_SHARP_LS033T3LX01) += mddi_nt_sharp_ls033t3lx01.o
-obj-$(CONFIG_MDDI_NOVATEK_PANEL_TMD_LT033MDV1000) += mddi_nt_tmd_lt033mdv1000.o
 
 EXTRA_CFLAGS += -Idrivers/video/msm
 

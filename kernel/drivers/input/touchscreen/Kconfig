@@ -301,20 +301,6 @@ config TOUCHSCREEN_SYNAPTICS_I2C_RMI
 	help
 	  This enables support for Synaptics RMI over I2C based touchscreens.
 
-config TOUCHSCREEN_CLEARPAD
-        tristate "Synaptics ClearPad"
-	default n
-        help
-          Say Y here to enable Synaptics ClearPad touchscreen.
-
-config TOUCHSCREEN_CLEARPAD_I2C
-        tristate "Synaptics ClearPad I2C"
-	depends on I2C
-	depends on TOUCHSCREEN_CLEARPAD
-	default n
-        help
-          Say Y here to enable Synaptics ClearPad I2C touchscreen.
-
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
 	select SERIO
@@ -653,14 +639,6 @@ config CY8CTMA300_SPI_MAX_Z
 	help
 	  The default value is 255 (the maximum value).
 
-config CY8CTMA300_SPI_WIDTH_MAJOR
-	int "Pseudo value for ABS_MT_WIDTH_MAJOR reporting"
-	default "10"
-	depends on TOUCHSCREEN_CY8CTMA300_SPI
-	help
-	  The device doesn't have actual tool width.
-	  This pseudo value is used to report ABS_MT_WIDTH_MAJOR.
-
 config TOUCHSCREEN_CYTTSP_I2C
 	default n
 	tristate "Cypress TTSP i2c touchscreen"
@@ -716,15 +694,4 @@ config TOUCHSCREEN_CYTTSP_KEY
 	help
 	  Activated for Cypress TTSP touchkey function
 
-config TOUCHSCREEN_CYTTSP_CHARGER_MODE
-	default n
-	bool "Cypress TTSP touch CHARGER MODE"
-	depends on TOUCHSCREEN_CYTTSP_CORE
-	help
-	  Activated for Cypress TTSP touch charger mode
-
-config TOUCHSCREEN_CYTTSP_ACT_INTRVL
-	default 0
-	int "Cypress TTSP active interval"
-	depends on TOUCHSCREEN_CYTTSP_CORE
 endif

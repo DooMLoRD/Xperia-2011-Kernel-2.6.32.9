@@ -186,15 +186,6 @@ config MACH_SEMC_ZEUS
 	help
 	  Support for the SonyEricsson Zeus devices.
 
-config MACH_SEMC_MOGAMI
-       depends on ARCH_MSM7X30
-       depends on !MSM_STACKED_MEMORY
-       select TI1271
-       default y
-       bool "SonyEricsson Mogami CDB"
-       help
-         Support for the SonyEricsson Mogami CDB (development board).
-
 config MACH_SEMC_ANZU
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
@@ -214,94 +205,6 @@ config MACH_SEMC_HALLON
 	bool "SonyEricsson Hallon"
 	help
 	  Support for the SonyEricsson Hallon devices.
-
-config MACH_SEMC_IYOKAN
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	select SUPPORT_ALIEN_USB_CHARGER
-	default y
-	bool "SonyEricsson Iyokan"
-	help
-	  Support for the SonyEricsson Iyokan devices.
-
-config MACH_SEMC_URUSHI
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	select SUPPORT_ALIEN_USB_CHARGER
-	default y
-	bool "SonyEricsson Urushi"
-	help
-	  Support for the SonyEricsson Urushi devices.
-
-config MACH_SEMC_SMULTRON
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	select SUPPORT_ALIEN_USB_CHARGER
-	default y
-	bool "SonyEricsson Smultron"
-	help
-	  Support for the SonyEricsson Smultron devices.
-
-config MACH_SEMC_SATSUMA
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271 if !CAPTURE_KERNEL
-	select SUPPORT_ALIEN_USB_CHARGER
-	default y
-	bool "SonyEricsson Satsuma"
-	help
-	  Support for the SonyEricsson Satsuma devices.
-
-config MACH_SEMC_MANGO
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	default n
-	bool "SonyEricsson Mango"
-	help
-	  Support for the SonyEricsson Mango devices.
-
-config MACH_SEMC_COCONUT
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	default n
-	bool "SonyEricsson Coconut"
-	help
-	  Support for the SonyEricsson Coconut devices.
-
-config MACH_SEMC_AKANE
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	select SUPPORT_ALIEN_USB_CHARGER
-	default y
-	bool "SonyEricsson Akane"
-	help
-	  Support for the SonyEricsson Akane devices.
-
-config MACH_SEMC_AZUSA
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	select SUPPORT_ALIEN_USB_CHARGER
-	default y
-	bool "SonyEricsson Azusa"
-	help
-	  Support for the SonyEricsson Azusa devices.
-
-config MACH_SEMC_HAIDA
-	depends on ARCH_MSM7X30
-	depends on !MSM_STACKED_MEMORY
-	select TI1271
-	select SUPPORT_ALIEN_USB_CHARGER
-	default y
-	bool "SonyEricsson Haida"
-	help
-	  Support for the SonyEricsson Haida devices.
 
 config MACH_SAPPHIRE
 	depends on ARCH_MSM7X01A
@@ -455,6 +358,7 @@ config MSM_STACKED_MEMORY
 config PHYS_OFFSET
 	hex
 	default "0x00200000" if !MSM_STACKED_MEMORY
+	default "0x03600000" if !MSM_STACKED_MEMORY && ARCH_MSM7X30
 	default "0x00000000" if ARCH_QSD8X50 && MSM_SOC_REV_A
 	default "0x20000000" if ARCH_QSD8X50
 	default "0x40200000" if ARCH_MSM8X60
@@ -1402,15 +1306,6 @@ config SIMPLE_REMOTE_PLATFORM
 	  Provides support for detecting 3.5mm audio jack, such as wired
 	  headset. This is the platform specific layer.
 
-config SIMPLE_REMOTE_INVERT_PLUG_DETECTION_STATE
-	bool "Invert state of plug detection"
-	depends on SIMPLE_REMOTE_PLATFORM
-	help
-	  This option enables to invert headphone plug detection state,
-	  currently the plug detection state was low state when headphone
-	  was inserted, but it is high state on some products, so that
-	  we need invert this state on these products.
-
 config ACC_CONVERTER_SUPPORT
 	bool "Enable support for acessory conversion"
 	depends on SIMPLE_REMOTE_PLATFORM
@@ -1456,42 +1351,11 @@ config USE_PMIC_CHARGING_ON_AMSS
 	depends on ARCH_MSM7X30
 	default n
 
-config SEMC_MOGAMI_FELICA_SUPPORT
-	bool "Enable Mogami FeliCa support"
-	depends on ARCH_MSM7X30
-	default n
-	help
-	  This enables FeliCa support on a Mogami product.
-
-config SEMC_MOGAMI_IRDA
-	bool "Enable Mogami IrDA support"
-	depends on ARCH_MSM7X30
-	default n
-	help
-	  This enables the Mogami IrDA support.
-
 config MOGAMI_PMIC_KEYPAD
 	bool "Enable Mogami pmic gpio keypad support"
 	depends on ARCH_MSM7X30
 	default n
 	help
 	  This enables the Mogami pmic gpio keypad support.
-
-config SEMC_BATTERY_SHOW_HEALTH
-	bool "Enable battery health support"
-	depends on BATTERY_SEMC_ARCH
-	default n if BATTERY_CHARGALG
-	default y if !BATTERY_CHARGALG
-	help
-	  Enable if battery health property is not supported
-	  in any other module besides this.
-	  This enables support for power supply class
-	  POWER_SUPPLY_PROP_HEALTH property.
-
-config MMC_MSM_SDC4_LOW_DRIVE_STRENGTH
-	bool "Enable low drive strength configuration"
-	default n
-	help
-	  Enable to configure the low drive strength for SDC4.
 
 endif

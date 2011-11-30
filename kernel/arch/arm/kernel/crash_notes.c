@@ -89,7 +89,6 @@ static void write_crash_notes(int real)
 	struct elf_note *note;
 	u32 *buf;
 	u32 *start;
-	char process_name[TASK_COMM_LEN];
 #ifdef CONFIG_CRASH_NOTES_MAGIC
 	u32 c;
 	struct crash_extras* extras;
@@ -104,11 +103,9 @@ static void write_crash_notes(int real)
 	prstatus.pr_pid = current->pid;
 
 	BUG_ON(sizeof(prstatus.pr_reg) != sizeof(struct pt_regs));
-	if (real) {
+	if (real)
 		dump_regs((struct pt_regs*)&prstatus.pr_reg);
-		get_task_comm(process_name, current);
-		printk(KERN_ERR "&@panic_name@:*%s*\n", process_name);
-	}
+
 	note = (struct elf_note*)buf;
 	note->n_namesz = strlen(CRASH_NOTE_NAME) + 1;
 	note->n_descsz = sizeof(prstatus);

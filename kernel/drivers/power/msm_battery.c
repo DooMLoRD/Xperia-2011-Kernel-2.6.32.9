@@ -41,7 +41,6 @@
 #define BATTERY_RPC_PROG	0x30000089
 #define BATTERY_RPC_VER_1_1	0x00010001
 #define BATTERY_RPC_VER_2_1	0x00020001
-#define BATTERY_RPC_VER_4_1     0x00040001
 #define BATTERY_RPC_VER_5_1     0x00050001
 
 #define BATTERY_RPC_CB_PROG	(BATTERY_RPC_PROG | 0x01000000)
@@ -50,8 +49,6 @@
 #define CHG_RPC_VER_1_1		0x00010001
 #define CHG_RPC_VER_1_3		0x00010003
 #define CHG_RPC_VER_2_2		0x00020002
-#define CHG_RPC_VER_3_1         0x00030001
-#define CHG_RPC_VER_4_1         0x00040001
 
 #define BATTERY_REGISTER_PROC                          	2
 #define BATTERY_MODIFY_CLIENT_PROC                     	4
@@ -471,7 +468,7 @@ static void msm_batt_update_psy_status(void)
 
 	/* Make correction for battery status */
 	if (battery_status == BATTERY_STATUS_INVALID_v1) {
-		if (msm_batt_info.chg_api_version < CHG_RPC_VER_3_1)
+		if (msm_batt_info.chg_api_version < CHG_RPC_VER_2_2)
 			battery_status = BATTERY_STATUS_INVALID;
 	}
 
@@ -897,30 +894,10 @@ struct batt_client_registration_req {
 	u32 batt_error;
 };
 
-struct batt_client_registration_req_4_1 {
-	/* The voltage at which callback (CB) should be called. */
-	u32 desired_batt_voltage;
-
-	/* The direction when the CB should be called. */
-	u32 voltage_direction;
-
-	/* The registered callback to be called when voltage and
-	 * direction specs are met. */
-	u32 batt_cb_id;
-
-	/* The call back data */
-	u32 cb_data;
-	u32 batt_error;
-};
 struct batt_client_registration_rep {
 	u32 batt_handle;
 };
 
-struct batt_client_registration_rep_4_1 {
-	u32 batt_handle;
-	u32 more_data;
-	u32 err;
-};
 static int msm_batt_register_arg_func(struct msm_rpc_client *batt_client,
 				       void *buf, void *data)
 {
@@ -930,119 +907,63 @@ static int msm_batt_register_arg_func(struct msm_rpc_client *batt_client,
 	int size = 0;
 
 
-	if (msm_batt_info.batt_api_version == BATTERY_RPC_VER_4_1) {
-		*req = cpu_to_be32(batt_reg_req->desired_batt_voltage);
-		size += sizeof(u32);
-		req++;
+	*req = cpu_to_be32(batt_reg_req->desired_batt_voltage);
+	size += sizeof(u32);
+	req++;
 
-		*req = cpu_to_be32(batt_reg_req->voltage_direction);
-		size += sizeof(u32);
-		req++;
+	*req = cpu_to_be32(batt_reg_req->voltage_direction);
+	size += sizeof(u32);
+	req++;
 
-		*req = cpu_to_be32(batt_reg_req->batt_cb_id);
-		size += sizeof(u32);
-		req++;
+	*req = cpu_to_be32(batt_reg_req->batt_cb_id);
+	size += sizeof(u32);
+	req++;
 
-		*req = cpu_to_be32(batt_reg_req->cb_data);
-		size += sizeof(u32);
-		req++;
+	*req = cpu_to_be32(batt_reg_req->cb_data);
+	size += sizeof(u32);
+	req++;
 
-		*req = cpu_to_be32(batt_reg_req->batt_error);
-		size += sizeof(u32);
+	*req = cpu_to_be32(batt_reg_req->more_data);
+	size += sizeof(u32);
+	req++;
 
-		return size;
-	} else {
-		*req = cpu_to_be32(batt_reg_req->desired_batt_voltage);
-		size += sizeof(u32);
-		req++;
+	*req = cpu_to_be32(batt_reg_req->batt_error);
+	size += sizeof(u32);
 
-		*req = cpu_to_be32(batt_reg_req->voltage_direction);
-		size += sizeof(u32);
-		req++;
-
-		*req = cpu_to_be32(batt_reg_req->batt_cb_id);
-		size += sizeof(u32);
-		req++;
-
-		*req = cpu_to_be32(batt_reg_req->cb_data);
-		size += sizeof(u32);
-		req++;
-
-		*req = cpu_to_be32(batt_reg_req->more_data);
-		size += sizeof(u32);
-		req++;
-
-		*req = cpu_to_be32(batt_reg_req->batt_error);
-		size += sizeof(u32);
-
-		return size;
-	}
-
+	return size;
 }
 
 static int msm_batt_register_ret_func(struct msm_rpc_client *batt_client,
 				       void *buf, void *data)
 {
 	struct batt_client_registration_rep *data_ptr, *buf_ptr;
-	struct batt_client_registration_rep_4_1 *data_ptr_4_1, *buf_ptr_4_1;
 
-	if (msm_batt_info.batt_api_version == BATTERY_RPC_VER_4_1) {
-		data_ptr_4_1 = (struct batt_client_registration_rep_4_1 *)data;
-		buf_ptr_4_1 = (struct batt_client_registration_rep_4_1 *)buf;
-
-		data_ptr_4_1->batt_handle
-			= be32_to_cpu(buf_ptr_4_1->batt_handle);
-		data_ptr_4_1->more_data
-			= be32_to_cpu(buf_ptr_4_1->more_data);
-		data_ptr_4_1->err = be32_to_cpu(buf_ptr_4_1->err);
-		return 0;
-	} else {
 	data_ptr = (struct batt_client_registration_rep *)data;
 	buf_ptr = (struct batt_client_registration_rep *)buf;
 
 	data_ptr->batt_handle = be32_to_cpu(buf_ptr->batt_handle);
 
 	return 0;
-	}
 }
 
 static int msm_batt_register(u32 desired_batt_voltage,
 			     u32 voltage_direction, u32 batt_cb_id, u32 cb_data)
 {
 	struct batt_client_registration_req batt_reg_req;
-	struct batt_client_registration_req_4_1 batt_reg_req_4_1;
 	struct batt_client_registration_rep batt_reg_rep;
-	struct batt_client_registration_rep_4_1 batt_reg_rep_4_1;
-	void *request;
-	void *reply;
 	int rc;
 
-	if (msm_batt_info.batt_api_version == BATTERY_RPC_VER_4_1) {
-		batt_reg_req_4_1.desired_batt_voltage = desired_batt_voltage;
-		batt_reg_req_4_1.voltage_direction = voltage_direction;
-		batt_reg_req_4_1.batt_cb_id = batt_cb_id;
-		batt_reg_req_4_1.cb_data = cb_data;
-		batt_reg_req_4_1.batt_error = 1;
-		request = &batt_reg_req_4_1;
-	} else {
-		batt_reg_req.desired_batt_voltage = desired_batt_voltage;
-		batt_reg_req.voltage_direction = voltage_direction;
-		batt_reg_req.batt_cb_id = batt_cb_id;
-		batt_reg_req.cb_data = cb_data;
-		batt_reg_req.more_data = 1;
-		batt_reg_req.batt_error = 0;
-		request = &batt_reg_req;
-	}
-
-	if (msm_batt_info.batt_api_version == BATTERY_RPC_VER_4_1)
-		reply = &batt_reg_rep_4_1;
-	else
-		reply = &batt_reg_rep;
+	batt_reg_req.desired_batt_voltage = desired_batt_voltage;
+	batt_reg_req.voltage_direction = voltage_direction;
+	batt_reg_req.batt_cb_id = batt_cb_id;
+	batt_reg_req.cb_data = cb_data;
+	batt_reg_req.more_data = 1;
+	batt_reg_req.batt_error = 0;
 
 	rc = msm_rpc_client_req(msm_batt_info.batt_client,
 			BATTERY_REGISTER_PROC,
-			msm_batt_register_arg_func, request,
-			msm_batt_register_ret_func, reply,
+			msm_batt_register_arg_func, &batt_reg_req,
+			msm_batt_register_ret_func, &batt_reg_rep,
 			msecs_to_jiffies(BATT_RPC_TIMEOUT));
 
 	if (rc < 0) {
@@ -1050,16 +971,6 @@ static int msm_batt_register(u32 desired_batt_voltage,
 		return rc;
 	}
 
-	if (msm_batt_info.batt_api_version == BATTERY_RPC_VER_4_1) {
-		if (batt_reg_rep_4_1.more_data != 0
-			&& batt_reg_rep_4_1.err
-				!= BATTERY_REGISTRATION_SUCCESSFUL) {
-			pr_err("%s: vBatt Registration Failed proc_num=%d\n"
-					, __func__, BATTERY_REGISTER_PROC);
-			return -EIO;
-		}
-		msm_batt_info.batt_handle = batt_reg_rep_4_1.batt_handle;
-	} else
 	msm_batt_info.batt_handle = batt_reg_rep.batt_handle;
 
 	pr_debug("%s: got handle = %d\n", __func__, msm_batt_info.batt_handle);
@@ -1463,33 +1374,18 @@ static int __devinit msm_batt_init_rpc(void)
 	pr_info("Faking MSM battery\n");
 #else
 	msm_batt_info.chg_ep =
-		msm_rpc_connect_compatible(CHG_RPC_PROG, CHG_RPC_VER_4_1, 0);
-	msm_batt_info.chg_api_version =  CHG_RPC_VER_4_1;
+		msm_rpc_connect_compatible(CHG_RPC_PROG, CHG_RPC_VER_2_2, 0);
+
 	if (msm_batt_info.chg_ep == NULL) {
 		pr_err("%s: rpc connect CHG_RPC_PROG = NULL\n", __func__);
 		return -ENODEV;
-	}
-
-	if (IS_ERR(msm_batt_info.chg_ep)) {
-		msm_batt_info.chg_ep = msm_rpc_connect_compatible(
-				CHG_RPC_PROG, CHG_RPC_VER_3_1, 0);
-		msm_batt_info.chg_api_version =  CHG_RPC_VER_3_1;
-	}
-	if (IS_ERR(msm_batt_info.chg_ep)) {
+	} else if (IS_ERR(msm_batt_info.chg_ep)) {
 		msm_batt_info.chg_ep = msm_rpc_connect_compatible(
 				CHG_RPC_PROG, CHG_RPC_VER_1_1, 0);
 		msm_batt_info.chg_api_version =  CHG_RPC_VER_1_1;
-	}
-	if (IS_ERR(msm_batt_info.chg_ep)) {
-		msm_batt_info.chg_ep = msm_rpc_connect_compatible(
-				CHG_RPC_PROG, CHG_RPC_VER_1_3, 0);
-		msm_batt_info.chg_api_version =  CHG_RPC_VER_1_3;
-	}
-	if (IS_ERR(msm_batt_info.chg_ep)) {
-		msm_batt_info.chg_ep = msm_rpc_connect_compatible(
-				CHG_RPC_PROG, CHG_RPC_VER_2_2, 0);
+	} else
 		msm_batt_info.chg_api_version =  CHG_RPC_VER_2_2;
-	}
+
 	if (IS_ERR(msm_batt_info.chg_ep)) {
 		rc = PTR_ERR(msm_batt_info.chg_ep);
 		pr_err("%s: FAIL: rpc connect for CHG_RPC_PROG. rc=%d\n",
@@ -1506,32 +1402,25 @@ static int __devinit msm_batt_init_rpc(void)
 	/* Fall back to 1.1 for default */
 	if (msm_batt_info.chg_api_version < 0)
 		msm_batt_info.chg_api_version = CHG_RPC_VER_1_1;
-	msm_batt_info.batt_api_version =  BATTERY_RPC_VER_4_1;
 
 	msm_batt_info.batt_client =
 		msm_rpc_register_client("battery", BATTERY_RPC_PROG,
-					BATTERY_RPC_VER_4_1,
+					BATTERY_RPC_VER_2_1,
 					1, msm_batt_cb_func);
 
 	if (msm_batt_info.batt_client == NULL) {
 		pr_err("%s: FAIL: rpc_register_client. batt_client=NULL\n",
 		       __func__);
 		return -ENODEV;
-	}
-	if (IS_ERR(msm_batt_info.batt_client)) {
+	} else if (IS_ERR(msm_batt_info.batt_client)) {
 		msm_batt_info.batt_client =
 			msm_rpc_register_client("battery", BATTERY_RPC_PROG,
 						BATTERY_RPC_VER_1_1,
 						1, msm_batt_cb_func);
 		msm_batt_info.batt_api_version =  BATTERY_RPC_VER_1_1;
-	}
-	if (IS_ERR(msm_batt_info.batt_client)) {
-		msm_batt_info.batt_client =
-			msm_rpc_register_client("battery", BATTERY_RPC_PROG,
-						BATTERY_RPC_VER_2_1,
-						1, msm_batt_cb_func);
+	} else
 		msm_batt_info.batt_api_version =  BATTERY_RPC_VER_2_1;
-	}
+
 	if (IS_ERR(msm_batt_info.batt_client)) {
 		msm_batt_info.batt_client =
 			msm_rpc_register_client("battery", BATTERY_RPC_PROG,

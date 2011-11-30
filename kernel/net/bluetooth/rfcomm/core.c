@@ -228,9 +228,6 @@ static inline int rfcomm_check_security(struct rfcomm_dlc *d)
 	struct sock *sk = d->session->sock->sk;
 	__u8 auth_type;
 
-	if (!l2cap_pi(sk)->conn)
-		return 0;
-
 	switch (d->sec_level) {
 	case BT_SECURITY_HIGH:
 		auth_type = HCI_AT_GENERAL_BONDING_MITM;

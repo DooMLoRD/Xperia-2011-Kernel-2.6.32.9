@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -39,7 +39,7 @@ struct voice_data {
 	int dev_state;/*READY, CHANGE, REL_DONE,INIT*/
 	int voc_state;/*INIT, CHANGE, RELEASE, ACQUIRE */
 	struct mutex voc_lock;
-	struct mutex vol_lock;
+	struct mutex lock;
 	int voc_event;
 	int dev_event;
 	atomic_t rel_start_flag;
@@ -100,7 +100,6 @@ static void voice_auddev_cb_function(u32 evt_id,
 
 	MM_INFO("auddev_cb_function, evt_id=%d, dev_state=%d, voc_state=%d\n",
 		evt_id, v->dev_state, v->voc_state);
-
 	if ((evt_id != AUDDEV_EVT_START_VOICE) ||
 			(evt_id != AUDDEV_EVT_END_VOICE)) {
 		if (evt_payload == NULL) {
@@ -108,7 +107,6 @@ static void voice_auddev_cb_function(u32 evt_id,
 			return;
 		}
 	}
-
 	switch (evt_id) {
 	case AUDDEV_EVT_START_VOICE:
 		if ((v->dev_state == DEV_INIT) ||
@@ -119,10 +117,6 @@ static void voice_auddev_cb_function(u32 evt_id,
 				v->dev_state = DEV_READY;
 				MM_DBG("dev_state into ready\n");
 				wake_up(&v->dev_wait);
-			}
-			if (v->voc_state == VOICE_CHANGE) {
-				MM_DBG("voc_state is in VOICE_CHANGE\n");
-				v->voc_state = VOICE_ACQUIRE;
 			}
 		}
 		break;
@@ -480,7 +474,7 @@ static int voice_cmd_device_info(struct voice_data *v)
 			v->dev_tx.dev_acdb_id, v->dev_rx.dev_acdb_id,
 			v->dev_tx.sample, v->dev_tx.mute);
 
-	mutex_lock(&voice.vol_lock);
+	mutex_lock(&voice.lock); // lock to prevent cmd data being modifed from two thread. ( voice_thread and auddev)
 
 	cmd.hdr.id = CMD_DEVICE_INFO;
 	cmd.hdr.data_len = sizeof(struct voice_device) -
@@ -506,7 +500,7 @@ static int voice_cmd_device_info(struct voice_data *v)
 	err = dalrpc_fcn_5(VOICE_DALRPC_CMD, v->handle, &cmd,
 			 sizeof(struct voice_device));
 
-	mutex_unlock(&voice.vol_lock);
+	mutex_unlock(&voice.lock); // lock to prevent cmd data being modifed from two thread. ( voice_thread and auddev)
 
 	if (err)
 		MM_ERR("Voice device command failed\n");
@@ -514,7 +508,7 @@ static int voice_cmd_device_info(struct voice_data *v)
 }
 EXPORT_SYMBOL(voice_cmd_device_info);
 
-static void voice_change_sample_rate(struct voice_data *v)
+void voice_change_sample_rate(struct voice_data *v)
 {
 	int freq = 48000;
 	int rc = 0;
@@ -596,14 +590,13 @@ static int voice_thread(void *data)
 				atomic_dec(&v->acq_start_flag);
 			break;
 		case VOICE_RELEASE_START:
-			MM_DBG("broadcast voice call end\n");
-			broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
-					VOICE_STATE_OFFCALL, SESSION_IGNORE);
 			if ((v->dev_state == DEV_REL_DONE) ||
 					(v->dev_state == DEV_INIT)) {
 				v->voc_state = VOICE_RELEASE;
 				msm_snddev_withdraw_freq(0, SNDDEV_CAP_TX,
 					AUDDEV_CLNT_VOC);
+				broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
+					VOICE_STATE_OFFCALL, SESSION_IGNORE);
 			} else {
 				/* wait for the dev_state = RELEASE */
 				rc = wait_event_interruptible(v->dev_wait,
@@ -614,6 +607,8 @@ static int voice_thread(void *data)
 				v->voc_state = VOICE_RELEASE;
 				msm_snddev_withdraw_freq(0, SNDDEV_CAP_TX,
 					AUDDEV_CLNT_VOC);
+				broadcast_event(AUDDEV_EVT_VOICE_STATE_CHG,
+					VOICE_STATE_OFFCALL, SESSION_IGNORE);
 			}
 			if (atomic_read(&v->rel_start_flag))
 				atomic_dec(&v->rel_start_flag);
@@ -675,8 +670,7 @@ static int __init voice_init(void)
 	MM_INFO("\n"); /* Macro prints the file name and function */
 
 	mutex_init(&voice.voc_lock);
-	mutex_init(&voice.vol_lock);
-
+	mutex_init(&voice.lock);
 	v->handle = NULL;
 	v->cb_handle = NULL;
 
