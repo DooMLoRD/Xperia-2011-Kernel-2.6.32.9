@@ -195,6 +195,8 @@ struct usb_ctrlrequest {
 #define USB_DT_WIRE_ADAPTER		0x21
 #define USB_DT_RPIPE			0x22
 #define USB_DT_CS_RADIO_CONTROL		0x23
+/* From the T10 UAS specification */
+#define USB_DT_PIPE_USAGE		0x24
 /* From the USB 3.0 spec */
 #define	USB_DT_SS_ENDPOINT_COMP		0x30
 
@@ -479,7 +481,7 @@ static inline int usb_endpoint_xfer_isoc(
 static inline int usb_endpoint_is_bulk_in(
 				const struct usb_endpoint_descriptor *epd)
 {
-	return (usb_endpoint_xfer_bulk(epd) && usb_endpoint_dir_in(epd));
+	return usb_endpoint_xfer_bulk(epd) && usb_endpoint_dir_in(epd);
 }
 
 /**
@@ -492,7 +494,7 @@ static inline int usb_endpoint_is_bulk_in(
 static inline int usb_endpoint_is_bulk_out(
 				const struct usb_endpoint_descriptor *epd)
 {
-	return (usb_endpoint_xfer_bulk(epd) && usb_endpoint_dir_out(epd));
+	return usb_endpoint_xfer_bulk(epd) && usb_endpoint_dir_out(epd);
 }
 
 /**
@@ -505,7 +507,7 @@ static inline int usb_endpoint_is_bulk_out(
 static inline int usb_endpoint_is_int_in(
 				const struct usb_endpoint_descriptor *epd)
 {
-	return (usb_endpoint_xfer_int(epd) && usb_endpoint_dir_in(epd));
+	return usb_endpoint_xfer_int(epd) && usb_endpoint_dir_in(epd);
 }
 
 /**
@@ -518,7 +520,7 @@ static inline int usb_endpoint_is_int_in(
 static inline int usb_endpoint_is_int_out(
 				const struct usb_endpoint_descriptor *epd)
 {
-	return (usb_endpoint_xfer_int(epd) && usb_endpoint_dir_out(epd));
+	return usb_endpoint_xfer_int(epd) && usb_endpoint_dir_out(epd);
 }
 
 /**
@@ -531,7 +533,7 @@ static inline int usb_endpoint_is_int_out(
 static inline int usb_endpoint_is_isoc_in(
 				const struct usb_endpoint_descriptor *epd)
 {
-	return (usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_in(epd));
+	return usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_in(epd);
 }
 
 /**
@@ -544,7 +546,7 @@ static inline int usb_endpoint_is_isoc_in(
 static inline int usb_endpoint_is_isoc_out(
 				const struct usb_endpoint_descriptor *epd)
 {
-	return (usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_out(epd));
+	return usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_out(epd);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -560,6 +562,8 @@ struct usb_ss_ep_comp_descriptor {
 } __attribute__ ((packed));
 
 #define USB_DT_SS_EP_COMP_SIZE		6
+/* Bits 4:0 of bmAttributes if this is a bulk endpoint */
+#define USB_SS_MAX_STREAMS(p)		(1 << (p & 0x1f))
 
 /*-------------------------------------------------------------------------*/
 
@@ -622,7 +626,6 @@ struct usb_interface_assoc_descriptor {
 } __attribute__ ((packed));
 
 
-#define USB_DT_INTERFACE_ASSOCIATION_SIZE  8
 /*-------------------------------------------------------------------------*/
 
 /* USB_DT_SECURITY:  group of wireless security descriptors, including
@@ -810,5 +813,15 @@ enum usb_device_state {
 	 * suspend states.  (L2 being original USB 1.1 suspend.)
 	 */
 };
+
+/*-------------------------------------------------------------------------*/
+
+/*
+ * As per USB compliance update, a device that is actively drawing
+ * more than 100mA from USB must report itself as bus-powered in
+ * the GetStatus(DEVICE) call.
+ * http://compliance.usb.org/index.asp?UpdateFile=Electrical&Format=Standard#34
+ */
+#define USB_SELF_POWER_VBUS_MAX_DRAW		100
 
 #endif /* __LINUX_USB_CH9_H */
