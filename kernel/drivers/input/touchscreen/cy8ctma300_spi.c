@@ -855,6 +855,18 @@ static void cy8ctma300_mt_handler(struct cy8ctma300_touch *tp, u8 *read_buf)
 						tp->mt_pos[i].y);
 			input_report_abs(tp->input, ABS_MT_TOUCH_MAJOR,
 						touch_major);
+
+			// [START] DooMLoRD: ICS TS FIX (PART 1)
+			if (tp->track_state[i] == TP_TRACK_INACTIVE) {
+			input_report_abs(tp->input, ABS_PRESSURE, 0);
+			input_report_key(tp->input, BTN_TOUCH, 0);
+			}
+			else {
+			input_report_abs(tp->input, ABS_PRESSURE, 255);
+			input_report_key(tp->input, BTN_TOUCH, 1);
+			}
+			// [ END ] DooMLoRD: ICS TS FIX (PART 1)
+
 			input_report_abs(tp->input, ABS_MT_WIDTH_MAJOR,
 						width_major);
 			input_mt_sync(tp->input);
@@ -1914,6 +1926,9 @@ static int cy8ctma300_touch_probe(struct spi_device *spi)
 	input_set_abs_params(dev, ABS_MT_POSITION_X, 0, pdata->x_max, 0, 0);
 	input_set_abs_params(dev, ABS_MT_POSITION_Y, 0, pdata->y_max, 0, 0);
 	input_set_abs_params(dev, ABS_MT_TOUCH_MAJOR, 0, pdata->width_major, 0, 0);
+	// [START] DooMLoRD: ICS TS FIX (PART 2)
+	input_set_abs_params(dev, ABS_PRESSURE, 0, 255, 0, 0);
+	// [ END ] DooMLoRD: ICS TS FIX (PART 2)
 	input_set_abs_params(dev, ABS_MT_WIDTH_MAJOR, 0, pdata->z_max, 0, 0);
 
 	err = input_register_device(dev);
