@@ -111,7 +111,7 @@
 #define AKM8975_GPIO				92
 #define NOVATEK_GPIO_RESET			157
 
-#define MSM_PMEM_SF_SIZE	0x500000
+#define MSM_PMEM_SF_SIZE	0x1E00000
 #define MSM_FB_SIZE		0x500000
 #define MSM_GPU_PHYS_SIZE       SZ_2M
 #define MSM_PMEM_CAMERA_SIZE    0x2000000
@@ -1971,73 +1971,113 @@ static struct kgsl_cpufreq_voter kgsl_cpufreq_voter = {
 	},
 };
 
-static void kgsl_idle_cb(int idle)
-{
-	if (idle != kgsl_cpufreq_voter.idle) {
-		kgsl_cpufreq_voter.idle = idle;
-		msm_cpufreq_voter_update(&kgsl_cpufreq_voter.voter);
-	}
-}
-
-static struct kgsl_platform_data kgsl_pdata = {
-	/* AXI rates in KHz */
-	.high_axi_3d = 192000,
-	.high_axi_2d = 192000,
-
-	.max_grp2d_freq = 0,
-	.min_grp2d_freq = 0,
-	.set_grp2d_async = NULL,	/* HW workaround, run Z180 SYNC @ 192 MHZ */
-	.max_grp3d_freq = 245760000,
-	.min_grp3d_freq = 192 * 1000*1000,
-	.set_grp3d_async = set_grp3d_async,
-	.imem_clk_name = "imem_clk",
-	.grp3d_clk_name = "grp_clk",
-	.grp2d0_clk_name = "grp_2d_clk",
-	.idle_callback = kgsl_idle_cb,
+struct resource kgsl_3d0_resources[] = {
+	{
+		.name  = KGSL_3D0_REG_MEMORY,
+		.start = 0xA3500000, /* 3D GRP address */
+		.end = 0xA351ffff,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name = KGSL_3D0_IRQ,
+		.start = INT_GRP_3D,
+		.end = INT_GRP_3D,
+		.flags = IORESOURCE_IRQ,
+	},
 };
 
-static struct resource kgsl_resources[] = {
-	{
-	 .name = "kgsl_reg_memory",
-	 .start = 0xA3500000,	/* 3D GRP address */
-	 .end = 0xA351ffff,
-	 .flags = IORESOURCE_MEM,
-	 },
-	{
-	 .name = "kgsl_phys_memory",
-	 .start = 0,
-	 .end = 0,
-	 .flags = IORESOURCE_MEM,
-	 },
-	{
-	 .name = "kgsl_yamato_irq",
-	 .start = INT_GRP_3D,
-	 .end = INT_GRP_3D,
-	 .flags = IORESOURCE_IRQ,
-	 },
-	{
-	 .name = "kgsl_2d0_reg_memory",
-	 .start = 0xA3900000,	/* Z180 base address */
-	 .end = 0xA3900FFF,
-	 .flags = IORESOURCE_MEM,
-	 },
-	{
-	 .name = "kgsl_2d0_irq",
-	 .start = INT_GRP_2D,
-	 .end = INT_GRP_2D,
-	 .flags = IORESOURCE_IRQ,
-	 },
-};
-
-static struct platform_device msm_device_kgsl = {
-	.name = "kgsl",
-	.id = -1,
-	.num_resources = ARRAY_SIZE(kgsl_resources),
-	.resource = kgsl_resources,
-	.dev = {
-		.platform_data = &kgsl_pdata,
+static struct kgsl_device_platform_data kgsl_3d0_pdata = {
+	.pwr_data = {
+		.pwrlevel = {
+			{
+				.gpu_freq = 245760000,
+				.bus_freq = 192000000,
+			},
+			{
+				.gpu_freq = 192000000,
+				.bus_freq = 152000000,
+			},
+			{
+				.gpu_freq = 192000000,
+				.bus_freq = 0,
+			},
 		},
+		.init_level = 0,
+		.num_levels = 3,
+		.set_grp_async = set_grp3d_async,
+		.idle_timeout = HZ/20,
+		.nap_allowed = true,
+	},
+	.clk = {
+		.name = {
+			.clk = "grp_clk",
+			.pclk = "grp_pclk",
+		},
+	},
+	.imem_clk_name = {
+		.clk = "imem_clk",
+		.pclk = NULL,
+	},
 };
+
+struct platform_device msm_kgsl_3d0 = {
+	.name = "kgsl-3d0",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(kgsl_3d0_resources),
+	.resource = kgsl_3d0_resources,
+	.dev = {
+		.platform_data = &kgsl_3d0_pdata,
+	},
+};
+
+static struct resource kgsl_2d0_resources[] = {
+	{
+		.name = KGSL_2D0_REG_MEMORY,
+		.start = 0xA3900000, /* Z180 base address */
+		.end = 0xA3900FFF,
+		.flags = IORESOURCE_MEM,
+	},
+	{
+		.name = KGSL_2D0_IRQ,
+		.start = INT_GRP_2D,
+		.end = INT_GRP_2D,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct kgsl_device_platform_data kgsl_2d0_pdata = {
+	.pwr_data = {
+		.pwrlevel = {
+			{
+				.gpu_freq = 0,
+				.bus_freq = 192000000,
+			},
+		},
+		.init_level = 0,
+		.num_levels = 1,
+		/* HW workaround, run Z180 SYNC @ 192 MHZ */
+		.set_grp_async = NULL,
+		.idle_timeout = HZ/10,
+		.nap_allowed = true,
+	},
+	.clk = {
+		.name = {
+			.clk = "grp_2d_clk",
+			.pclk = "grp_2d_pclk",
+		},
+	},
+};
+
+struct platform_device msm_kgsl_2d0 = {
+	.name = "kgsl-2d0",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(kgsl_2d0_resources),
+	.resource = kgsl_2d0_resources,
+	.dev = {
+		.platform_data = &kgsl_2d0_pdata,
+	},
+};
+
 
 static int msm_fb_mddi_sel_clk(u32 *clk_rate)
 {
@@ -2484,7 +2524,8 @@ static struct platform_device *devices[] __initdata = {
 	&msm_aux_pcm_device,
 	&msm_device_adspdec,
 	&qup_device_i2c,
-	&msm_device_kgsl,
+	&msm_kgsl_3d0,
+	&msm_kgsl_2d0,
 	&msm_device_uart3,
 	&msm_device_vidc_720p,
 	&msm_gemini_device,
@@ -3430,6 +3471,7 @@ static void __init msm7x30_allocate_memory_regions(void)
 	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
 		size, addr, __pa(addr));
 
+/*
 	size = gpu_phys_size;
 	if (size) {
 		addr = alloc_bootmem(size);
@@ -3438,6 +3480,7 @@ static void __init msm7x30_allocate_memory_regions(void)
 		pr_info("allocating %lu bytes at %p (%lx physical) for "
 			"KGSL\n", size, addr, __pa(addr));
 	}
+*/
 
 	size = pmem_adsp_size;
 
