@@ -1,0 +1,10 @@
+ARCH=arm CROSS_COMPILE=/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi- make semc_zeus_defconfig
+echo "PLAY" > CURRENT_CONFIG
+cat .version_PLAY > .version
+echo "4.4.3" > CURRENT_TOOLCHAIN
+rm Makefile
+cp Makefile.gcc443 Makefile
+rm drivers/net/wireless/bcm4329/Makefile
+cp drivers/net/wireless/bcm4329/Makefile.gcc443 drivers/net/wireless/bcm4329/Makefile
+rm scripts/mkcompile_h
+cp scripts/mkcompile_h.gcc443 scripts/mkcompile_h

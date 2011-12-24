@@ -24,7 +24,6 @@
 
 #include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
-#include <linux/usb/android_composite.h>
 #include <linux/workqueue.h>
 
 #define WRITE_COMPLETE 0
@@ -124,7 +123,7 @@ static struct diag_req_entry *diag_alloc_req_entry(struct usb_ep *,
 static void diag_free_req_entry(struct usb_ep *, struct diag_req_entry *);
 static void diag_read_complete(struct usb_ep *, struct usb_request *);
 
-static inline struct diag_context *func_to_dev(struct usb_function *f)
+static inline struct diag_context *diag_func_to_dev(struct usb_function *f)
 {
 	return container_of(f, struct diag_context, function);
 }
@@ -132,7 +131,7 @@ static inline struct diag_context *func_to_dev(struct usb_function *f)
 static void diag_function_unbind(struct usb_configuration *c,
 		struct usb_function *f)
 {
-	struct diag_context *ctxt = func_to_dev(f);
+	struct diag_context *ctxt = diag_func_to_dev(f);
 
 	if (!ctxt)
 		return;
@@ -162,7 +161,7 @@ static int diag_function_bind(struct usb_configuration *c,
 		struct usb_function *f)
 {
 	struct usb_composite_dev *cdev = c->cdev;
-	struct diag_context *ctxt = func_to_dev(f);
+	struct diag_context *ctxt = diag_func_to_dev(f);
 	struct usb_ep      *ep;
 	int status = -ENODEV;
 
@@ -205,7 +204,7 @@ fail:
 static int diag_function_set_alt(struct usb_function *f,
 		unsigned intf, unsigned alt)
 {
-	struct diag_context  *dev = func_to_dev(f);
+	struct diag_context  *dev = diag_func_to_dev(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 	unsigned long flags;
 	int status = -ENODEV;
@@ -231,7 +230,7 @@ static int diag_function_set_alt(struct usb_function *f,
 }
 static void diag_function_disable(struct usb_function *f)
 {
-	struct diag_context  *dev = func_to_dev(f);
+	struct diag_context  *dev = diag_func_to_dev(f);
 	unsigned long flags;
 
 	printk(KERN_INFO "diag_function_disable\n");
@@ -559,21 +558,13 @@ err1:
 }
 
 #ifdef CONFIG_USB_ANDROID_DIAG
-static struct android_usb_function diag_function = {
-	.name = "diag",
-	.bind_config = diag_function_add,
-};
-
-static int __init init(void)
+static int android_usb_diag_init(void)
 {
 	struct diag_context *dev = &_context;
 
 	printk(KERN_INFO "f_diag init\n");
 	/* TBD: serial number should come from platform data */
 	dev->serial_number    = "1234567890ABCDEF";
-	android_register_function(&diag_function);
 	return 0;
 }
-module_init(init);
-
 #endif /* CONFIG_USB_ANDROID_DIAG */

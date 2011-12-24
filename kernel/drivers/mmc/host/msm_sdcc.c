@@ -1812,9 +1812,9 @@ static int msmsdcc_pm_suspend(struct device *dev)
 	if (mmc) {
 		struct msmsdcc_host *host = mmc_priv(mmc);
 
-		if (mmc->card && mmc->card->type != MMC_TYPE_SDIO)
+		if (!(mmc->pm_flags & MMC_PM_KEEP_POWER))
 			rc = mmc_suspend_host(mmc, PMSG_SUSPEND);
-		else if (host->plat->status_irq)
+		if (host->plat->status_irq)
 			disable_irq(host->plat->status_irq);
 
 		if (!rc) {
@@ -1850,9 +1850,10 @@ static int msmsdcc_pm_resume(struct device *dev)
 
 		spin_unlock_irqrestore(&host->lock, flags);
 
-		if (mmc->card && mmc->card->type != MMC_TYPE_SDIO)
+		if (!(mmc->pm_flags & MMC_PM_KEEP_POWER))
 			mmc_resume_host(mmc);
-		else if (host->plat->status_irq)
+
+		if (host->plat->status_irq)
 			enable_irq(host->plat->status_irq);
 	}
 	return 0;

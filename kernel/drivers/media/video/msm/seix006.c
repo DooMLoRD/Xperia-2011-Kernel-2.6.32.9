@@ -122,6 +122,8 @@ enum {
 };
 static int camera_flash = FLASH_OFF;
 static int camera_variable_frame_rate = 1;
+/* 1 if continous auto focus is active */
+static int camera_continous_autofocus;
 DEFINE_MUTEX(seix006_capture_lock);
 
 /*
@@ -1421,6 +1423,7 @@ static int32_t seix006_update_focus_mode(enum camera_focus_mode focus_mode)
 			seix006_i2c_write(SEIX006_AF_4838, BYTE_2,
 					(uint8_t *) &seix006_ctrl->af_4838_val);
 		}
+		camera_continous_autofocus = 0;
 	break;
 
 	case SENSOR_FOCUS_MODE_CONTINUOUS:
@@ -1429,6 +1432,7 @@ static int32_t seix006_update_focus_mode(enum camera_focus_mode focus_mode)
 		if (!ret) {
 			ret = seix006_set_regs(seix006_primary_focus_window_continuous);
 			CDBG("seix006_update_focus_mode setting focus window continuous\n");
+			camera_continous_autofocus = 1;
 		}
 		if (seix006_ctrl->af_4838_val !=
 				seix006_ctrl->calibration_data.af_d * 2) {
@@ -1796,7 +1800,14 @@ static int32_t seix006_set_dimensions(struct camera_dimension_t dimension)
 static int32_t seix006_set_framerate(uint16_t fps)
 {
 	int32_t ret = 0;
+	uint8_t register_value = 0x0;
 	CDBG("seix006_set_framerate fps=%d [S]\n", fps);
+
+	/* Block reset of focus on state change */
+	if (camera_continous_autofocus == 1) {
+		seix006_i2c_write(0x4884, BYTE_1, &register_value);
+		CDBG("seix006_set_framerate block refocus");
+	}
 
 	if (fps == 0) {
 		CDBG("seix006_set_framerate set variable");
@@ -1816,9 +1827,14 @@ static int32_t seix006_set_framerate(uint16_t fps)
 		CDBG("seix006_set_framerate error, %d fps not supported by camera\n", fps);
 		ret = -EFAULT;
 	}
+
+	/* Start and wait for state change */
 	CDBG("seix006_set_framerate restart");
-	ret = seix006_send_reg_table(seix006_MONI_REFRESH_F,
-					sizeof_seix006_MONI_REFRESH_F/sizeof(struct reg_entry));
+	seix006_refresh_monitor(1000);
+
+	/* Restore reset focus setting on state change */
+	register_value = 0x1;
+	seix006_i2c_write(0x4884, BYTE_1, &register_value);
 
 	CDBG("seix006_set_framerate [E] ret[%d]\n", ret);
 
@@ -2007,6 +2023,8 @@ static int32_t seix006_sensor_init(void)
 	seix006_ctrl->scan_range_reg = SEIX006_SCAN_RANGE_REG_AUTO;
 	seix006_ctrl->scan_range_val = SEIX006_SCAN_RANGE_AUTO;
 
+	/* set continous autofocus flag to off by default */
+	camera_continous_autofocus = 0;
 
 	CDBG("seix006_sensor_init [E] ret[%d]\n", ret);
 

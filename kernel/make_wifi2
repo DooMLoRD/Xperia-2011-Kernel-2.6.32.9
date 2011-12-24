@@ -1,0 +1,21 @@
+cd ../
+cd vendor/ti/wlan/compat-wireless-wl12xx/
+./scripts/driver-select wl12xx
+ARCH=arm CROSS_COMPILE=/home/doomlord/android-toolchain-eabi-linaro-4.6-2011.10/bin/arm-eabi- KLIB=/home/doomlord/4.1.C.0.6/kernel KLIB_BUILD=/home/doomlord/4.1.C.0.6/kernel make
+cp ./net/wireless/cfg80211.ko ../../../../out/.
+cp ./net/mac80211/mac80211.ko ../../../../out/.
+cp ./compat/compat.ko ../../../../out/.
+cp ./compat/compat_firmware_class.ko ../../../../out/.
+cp ./drivers/net/wireless/wl12xx/wl12xx.ko ../../../../out/.
+cp ./drivers/net/wireless/wl12xx/wl12xx_sdio.ko ../../../../out/.
+cp ./drivers/net/wireless/wl12xx/wl12xx_spi.ko ../../../../out/.
+ARCH=arm CROSS_COMPILE=/home/doomlord/android-toolchain-eabi-linaro-4.6-2011.10/bin/arm-eabi- KLIB=/home/doomlord/4.1.C.0.6/kernel KLIB_BUILD=/home/doomlord/4.1.C.0.6/kernel make clean
+cd ../../../../out
+#/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-strip --strip-debug cfg80211.ko
+#/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-strip --strip-debug mac80211.ko
+#/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-strip --strip-debug compat.ko
+#/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-strip --strip-debug compat_firmware_class.ko
+#/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-strip --strip-debug wl12xx.ko
+#/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-strip --strip-debug wl12xx_sdio.ko
+#/home/doomlord/android/system/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-strip --strip-debug wl12xx_spi.ko
+cd ..

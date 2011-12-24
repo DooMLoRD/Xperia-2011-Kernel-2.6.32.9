@@ -2,6 +2,7 @@
  *
  * Copyright (C) 2007 Google, Inc.
  * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2011 Sony Ericsson Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -42,6 +43,9 @@ static struct notifier_block axi_freq_notifier_block;
 struct clk *clk_get(struct device *dev, const char *id)
 {
 	struct clk *clk;
+
+	if (!id)
+		return ERR_PTR(-ENOENT);
 
 	mutex_lock(&clocks_mutex);
 

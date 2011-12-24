@@ -99,7 +99,6 @@ void inet_put_port(struct sock *sk)
 	__inet_put_port(sk);
 	local_bh_enable();
 }
-
 EXPORT_SYMBOL(inet_put_port);
 
 void __inet_inherit_port(struct sock *sk, struct sock *child)
@@ -116,7 +115,6 @@ void __inet_inherit_port(struct sock *sk, struct sock *child)
 	inet_csk(child)->icsk_bind_hash = tb;
 	spin_unlock(&head->lock);
 }
-
 EXPORT_SYMBOL_GPL(__inet_inherit_port);
 
 static inline int compute_score(struct sock *sk, struct net *net,
@@ -209,7 +207,7 @@ struct sock * __inet_lookup_established(struct net *net,
 	 * have wildcards anyways.
 	 */
 	unsigned int hash = inet_ehashfn(net, daddr, hnum, saddr, sport);
-	unsigned int slot = hash & (hashinfo->ehash_size - 1);
+	unsigned int slot = hash & hashinfo->ehash_mask;
 	struct inet_ehash_bucket *head = &hashinfo->ehash[slot];
 
 	rcu_read_lock();
@@ -525,7 +523,6 @@ int inet_hash_connect(struct inet_timewait_death_row *death_row,
 	return __inet_hash_connect(death_row, sk, inet_sk_port_offset(sk),
 			__inet_check_established, __inet_hash_nolisten);
 }
-
 EXPORT_SYMBOL_GPL(inet_hash_connect);
 
 void inet_hashinfo_init(struct inet_hashinfo *h)
@@ -539,5 +536,4 @@ void inet_hashinfo_init(struct inet_hashinfo *h)
 				      i + LISTENING_NULLS_BASE);
 		}
 }
-
 EXPORT_SYMBOL_GPL(inet_hashinfo_init);

@@ -174,6 +174,7 @@ out:
 	fib_res_put(&res);
 	return dev;
 }
+EXPORT_SYMBOL(ip_dev_find);
 
 /*
  * Find address type as if only "dev" was present in the system. If
@@ -213,12 +214,14 @@ unsigned int inet_addr_type(struct net *net, __be32 addr)
 {
 	return __inet_dev_addr_type(net, NULL, addr);
 }
+EXPORT_SYMBOL(inet_addr_type);
 
 unsigned int inet_dev_addr_type(struct net *net, const struct net_device *dev,
 				__be32 addr)
 {
        return __inet_dev_addr_type(net, dev, addr);
 }
+EXPORT_SYMBOL(inet_dev_addr_type);
 
 /* Given (packet source, input interface) and optional (dst, oif, tos):
    - (main) check, that source is valid i.e. not broadcast or our local
@@ -1068,7 +1071,3 @@ void __init ip_fib_init(void)
 
 	fib_hash_init();
 }
-
-EXPORT_SYMBOL(inet_addr_type);
-EXPORT_SYMBOL(inet_dev_addr_type);
-EXPORT_SYMBOL(ip_dev_find);

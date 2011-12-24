@@ -181,7 +181,7 @@
 					this->irq_suspend_enabled = 0; } }
 
 static int force_update;
-static int shit_firmware;
+static int old_firmware;
 module_param(force_update, int, 0);
 MODULE_PARM_DESC(force_update, "Force flashing of driver firmware");
 
@@ -505,7 +505,7 @@ static int perform_reset(struct spi_device *spi)
 			mdelay(100);
 			/* some old firmware ACKs with IRQ before
 				really ready */
-			if (shit_firmware)
+			if (old_firmware)
 				mdelay(2000);
 			return 0;
 		};
@@ -644,7 +644,7 @@ static int query_chip(struct spi_device *spi)
 	if (pdata->no_fw_update == 0) {
 		if (appver < 58) {
 			printk(KERN_INFO "CY8CTMA300_TOUCH: old FW version, applying reset workarounds\n");
-			shit_firmware++;
+			old_firmware++;
 		};
 
 		DEBUG_PRINTK(KERN_INFO
@@ -702,9 +702,9 @@ static void cy8ctma300_fwupd_work(struct work_struct *work)
 		if (j[0] == TP_AP_BIT_APPMODE) {
 			DEBUG_PRINTK(KERN_INFO
 				"CY8CTMA300_TOUCH: have sane firmware rev now");
-			if (shit_firmware) {
+			if (old_firmware) {
 				DEBUG_PRINTK(", clearing bad-FW flag");
-				shit_firmware = 0;
+				old_firmware = 0;
 			};
 
 			DEBUG_PRINTK("\n");
@@ -737,7 +737,7 @@ reset_chip:
 
 	/* check for the case of older firmware that's not quite ready yet */
 	if (j[0] == 0xFF) {
-		shit_firmware++;
+		old_firmware++;
 		goto reset_chip;
 	};
 
@@ -746,7 +746,7 @@ reset_chip:
 
 	err = query_chip(spi);
 	if (err < 0) {
-		shit_firmware++;
+		old_firmware++;
 		goto reset_chip;
 	};
 
@@ -1272,6 +1272,7 @@ static int cy8ctma300_touch_probe(struct spi_device *spi)
 	struct cypress_touch_platform_data	*pdata = spi->dev.platform_data;
 	struct cy8ctma300_touch			*this;
 	int					err;
+	int					reset_retries = 3;
 
 	DEBUG_PRINTK(KERN_DEBUG "CY8CTMA300_TOUCH: cy8ctma300_touch_probe()\n");
 
@@ -1349,7 +1350,13 @@ static int cy8ctma300_touch_probe(struct spi_device *spi)
 		"CY8CTMA300_TOUCH: Firmware-update work queue init OK\n");
 
 	DEBUG_PRINTK(KERN_DEBUG "CY8CTMA300_TOUCH: About to reset device\n");
-	err = reset_device(this);
+
+	while (((err = reset_device(this)) < 0) && reset_retries--) {
+		DEBUG_PRINTK(KERN_DEBUG
+			"CY8CTMA300_TOUCH: retrying reset_device()\n");
+		msleep(100);
+	}
+
 	if (err < 0)
 		goto err_mem_free;
 
@@ -1369,7 +1376,10 @@ static int cy8ctma300_touch_probe(struct spi_device *spi)
 	};
 
 err_mem_free:
+	if (pdata->register_cb)
+		pdata->register_cb(NULL);
 	kfree(this);
+
 err_gpio_setup:
 	gpio_free(pdata->gpio_reset_pin);
 	gpio_free(pdata->gpio_irq_pin);

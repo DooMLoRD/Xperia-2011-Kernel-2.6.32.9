@@ -1245,6 +1245,7 @@ void ip_mc_inc_group(struct in_device *in_dev, __be32 addr)
 out:
 	return;
 }
+EXPORT_SYMBOL(ip_mc_inc_group);
 
 /*
  *	Resend IGMP JOIN report; used for bonding.
@@ -1267,6 +1268,7 @@ void ip_mc_rejoin_group(struct ip_mc_list *im)
 	igmp_ifc_event(in_dev);
 #endif
 }
+EXPORT_SYMBOL(ip_mc_rejoin_group);
 
 /*
  *	A socket has left a multicast group on device dev
@@ -1297,6 +1299,7 @@ void ip_mc_dec_group(struct in_device *in_dev, __be32 addr)
 		}
 	}
 }
+EXPORT_SYMBOL(ip_mc_dec_group);
 
 /* Device changing type */
 
@@ -1806,6 +1809,7 @@ done:
 	rtnl_unlock();
 	return err;
 }
+EXPORT_SYMBOL(ip_mc_join_group);
 
 static int ip_mc_leave_src(struct sock *sk, struct ip_mc_socklist *iml,
 			   struct in_device *in_dev)
@@ -2639,8 +2643,3 @@ int __init igmp_mc_proc_init(void)
 	return register_pernet_subsys(&igmp_net_ops);
 }
 #endif
-
-EXPORT_SYMBOL(ip_mc_dec_group);
-EXPORT_SYMBOL(ip_mc_inc_group);
-EXPORT_SYMBOL(ip_mc_join_group);
-EXPORT_SYMBOL(ip_mc_rejoin_group);

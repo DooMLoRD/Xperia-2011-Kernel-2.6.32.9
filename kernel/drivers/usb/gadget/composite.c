@@ -18,14 +18,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* #define VERBOSE_DEBUG */
-
 #include <linux/kallsyms.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/utsname.h>
-
 #include <linux/usb/composite.h>
 
 
@@ -37,7 +34,7 @@
  */
 
 /* big enough to hold our biggest descriptor */
-#define USB_BUFSIZ	1024
+#define USB_BUFSIZ	4096
 
 static struct usb_composite_driver *composite;
 static int (*composite_gadget_bind)(struct usb_composite_dev *cdev);
@@ -859,6 +856,10 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	struct usb_function		*f = NULL;
 	u8				endp;
 
+
+	if (w_length > USB_BUFSIZ)
+		return value;
+
 	/* partial re-init of the response message; the function or the
 	 * gadget might need to intercept e.g. a control-OUT completion
 	 * when we delegate to it.
@@ -1271,6 +1272,7 @@ composite_resume(struct usb_gadget *gadget)
 static struct usb_gadget_driver composite_driver = {
 	.speed		= USB_SPEED_HIGH,
 
+	.bind		= composite_bind,
 	.unbind		= composite_unbind,
 
 	.setup		= composite_setup,
@@ -1317,7 +1319,6 @@ int usb_composite_probe(struct usb_composite_driver *driver,
 	composite_driver.driver.name = driver->name;
 	composite = driver;
 	composite_gadget_bind = bind;
-	composite_driver.bind = composite_bind;
 
 	return usb_gadget_register_driver(&composite_driver);
 }

@@ -17,6 +17,7 @@
 #include <linux/gpio.h>
 #include <linux/string.h>
 #include <linux/types.h>
+#include <linux/switch.h>
 
 #include <linux/i2c/sii9024.h>
 
@@ -56,6 +57,9 @@ static ssize_t hdmi_sii_attr_store(struct kobject *kobj, struct attribute *attr,
 	char pwr_on[]     = "CHIP_ON";
 	char pwr_off[]    = "CHIP_OFF";
 
+	static const char hdmi_active[] = "HDMI_ACTIVE";
+	static const char hdmi_inactive[] = "HDMI_INACTIVE";
+
 
 	if (!(strncmp(buf, hpd_on, strlen(hpd_on)))) {
 		gpio_set_value(HDMI_SII_GPIO_HPD, 1);
@@ -81,6 +85,10 @@ static ssize_t hdmi_sii_attr_store(struct kobject *kobj, struct attribute *attr,
 	} else if (!(strncmp(buf, pwr_off, strlen(pwr_off)))) {
 		if (setchippower != NULL)
 			setchippower(0);
+	} else if (!(strncmp(buf, hdmi_active, sizeof(hdmi_active)))) {
+		switch_set_state(&hdmi_sii_state_obj->pdata->hdmi_switch, 1);
+	} else if (!(strncmp(buf, hdmi_inactive, sizeof(hdmi_inactive)))) {
+		switch_set_state(&hdmi_sii_state_obj->pdata->hdmi_switch, 0);
 	} else
 		return -EINVAL;
 
@@ -116,7 +124,7 @@ static struct kobj_type hdmi_sii_ktype = {
 };
 
 /* create HDMI kobject and initialize */
-static int create_hdmi_sii_state_kobj(void)
+static int create_hdmi_sii_state_kobj(struct sii9024_platform_data *pdata)
 {
 	int ret;
 
@@ -142,6 +150,7 @@ static int create_hdmi_sii_state_kobj(void)
 	hdmi_sii_state_obj->hpd   = 0;
 	hdmi_sii_state_obj->power = 0;
 	hdmi_sii_state_obj->reset = 0;
+	hdmi_sii_state_obj->pdata = pdata;
 
 	return 0;
 }
@@ -213,8 +222,11 @@ static int hdmi_sii_probe(struct i2c_client *client,
 
 	rc = hdmi_sii_enable(client);
 
-	if (create_hdmi_sii_state_kobj())
+	if (create_hdmi_sii_state_kobj(pdata))
 		return -ENOMEM;
+
+	pdata->hdmi_switch.name = "hdmi";
+	switch_dev_register(&pdata->hdmi_switch);
 
 	msm_fb_add_device(&hdmi_device);
 

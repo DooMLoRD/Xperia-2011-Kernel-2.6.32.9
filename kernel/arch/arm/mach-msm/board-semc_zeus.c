@@ -71,7 +71,7 @@
 #include "timer.h"
 #include "socinfo.h"
 #include "cpufreq.h"
-#include <linux/usb/android_composite.h>
+#include <linux/usb/android.h>
 #ifdef CONFIG_USB_ANDROID_ACCESSORY
 #include <linux/usb/f_accessory.h>
 #endif
@@ -1120,153 +1120,6 @@ static struct platform_device msm_device_adspdec = {
 		.platform_data = &msm_device_adspdec_database},
 };
 
-static char *usb_functions_msc[] = {
-	"usb_mass_storage",
-};
-
-static char *usb_functions_msc_adb[] = {
-	"adb",
-	"usb_mass_storage",
-};
-
-static char *usb_functions_msc_adb_eng[] = {
-	"usb_mass_storage",
-	"adb",
-	"modem",
-	"nmea",
-	"diag",
-};
-
-#if defined(CONFIG_USB_ANDROID_MTP_ARICENT)
-static char *usb_functions_mtp[] = {
-	"mtp",
-};
-
-static char *usb_functions_mtp_adb[] = {
-	"mtp",
-	"adb",
-};
-
-static char *usb_functions_mtp_msc[] = {
-	"mtp",
-	"usb_mass_storage",
-};
-
-static char *usb_functions_mtp_adb_eng[] = {
-	"mtp",
-	"adb",
-	"modem",
-	"nmea",
-	"diag",
-};
-#endif
-
-static char *usb_functions_rndis[] = {
-	"rndis",
-};
-
-static char *usb_functions_rndis_adb[] = {
-	"rndis",
-	"adb",
-};
-
-static char *usb_functions_diag[] = {
-	"adb",
-	"modem",
-	"diag",
-};
-
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
-static char *usb_functions_accessory[] = { "accessory" };
-static char *usb_functions_accessory_adb[] = { "accessory", "adb" };
-#endif
-
-static char *usb_functions_all[] = {
-	"rndis",
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
-	"accessory",
-#endif
-	"usb_mass_storage",
-#if defined(CONFIG_USB_ANDROID_MTP_ARICENT)
-	"mtp",
-#endif
-	"adb",
-	"modem",
-	"nmea",
-	"diag",
-};
-
-static struct android_usb_product usb_products[] = {
-	{
-		.product_id	= 0xE000 | CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_msc),
-		.functions	= usb_functions_msc,
-	},
-	{
-		.product_id	= 0x6000 | CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_msc_adb),
-		.functions	= usb_functions_msc_adb,
-	},
-#if defined(CONFIG_USB_ANDROID_MTP_ARICENT)
-	{
-		.product_id	= 0x0000 | CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_mtp),
-		.functions	= usb_functions_mtp,
-	},
-	{
-		.product_id	= 0x5000 | CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_mtp_adb),
-		.functions	= usb_functions_mtp_adb,
-	},
-	{
-		.product_id	= 0x4000 | CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_mtp_msc),
-		.functions	= usb_functions_mtp_msc,
-	},
-#endif
-	{
-		.product_id	= 0x7000 | CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_rndis),
-		.functions	= usb_functions_rndis,
-	},
-	{
-		.product_id	= 0x8000 | CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_rndis_adb),
-		.functions	= usb_functions_rndis_adb,
-	},
-	{
-		.product_id	= 0x9000 |  CONFIG_USB_PRODUCT_SUFFIX,
-		.num_functions	= ARRAY_SIZE(usb_functions_diag),
-		.functions	= usb_functions_diag,
-	},
-#if defined(CONFIG_USB_ANDROID_MTP_ARICENT)
-	{
-		.product_id	= 0x5146,
-		.num_functions	= ARRAY_SIZE(usb_functions_mtp_adb_eng),
-		.functions	= usb_functions_mtp_adb_eng,
-	},
-#endif
-	{
-		.product_id	= 0x6146,
-		.num_functions	= ARRAY_SIZE(usb_functions_msc_adb_eng),
-		.functions	= usb_functions_msc_adb_eng,
-	},
-#ifdef CONFIG_USB_ANDROID_ACCESSORY
-	{
-		.vendor_id      = USB_ACCESSORY_VENDOR_ID,
-		.product_id     = USB_ACCESSORY_PRODUCT_ID,
-		.num_functions  = ARRAY_SIZE(usb_functions_accessory),
-		.functions      = usb_functions_accessory,
-	},
-	{
-		.vendor_id      = USB_ACCESSORY_VENDOR_ID,
-		.product_id     = USB_ACCESSORY_ADB_PRODUCT_ID,
-		.num_functions  = ARRAY_SIZE(usb_functions_accessory_adb),
-		.functions      = usb_functions_accessory_adb,
-	},
-#endif
-};
-
 static struct usb_mass_storage_platform_data mass_storage_pdata = {
 	.nluns		= 1,
 	.vendor		= "SEMC",
@@ -1303,14 +1156,10 @@ static struct platform_device rndis_device = {
 
 static struct android_usb_platform_data android_usb_pdata = {
 	.vendor_id		= 0x0FCE,
-	.product_id		= 0xE000 | CONFIG_USB_PRODUCT_SUFFIX,
 	.version		= 0x0100,
-	.num_products		= ARRAY_SIZE(usb_products),
-	.products		= usb_products,
-	.num_functions		= ARRAY_SIZE(usb_functions_all),
-	.functions		= usb_functions_all,
 	.product_name		= "SEMC HSUSB Device",
 	.manufacturer_name	= "SEMC",
+	.usb_mass_storage_device = &mass_storage_device,
 	/* .serial_number filled_in by board_serialno_setup */
 };
 
@@ -1357,6 +1206,7 @@ static int __init board_serialno_setup(char *serialno)
 	}
 	usb_serial_number[20] = '\0';
 	android_usb_pdata.serial_number = usb_serial_number;
+	mass_storage_pdata.serial_number = usb_serial_number;
 
 	printk(KERN_INFO "USB serial number: %s\n",
 			android_usb_pdata.serial_number);

@@ -460,7 +460,8 @@ out:
 }
 
 
-static int tcp_v6_send_synack(struct sock *sk, struct request_sock *req)
+static int tcp_v6_send_synack(struct sock *sk, struct request_sock *req,
+			      struct request_values *rvp)
 {
 	struct inet6_request_sock *treq = inet6_rsk(req);
 	struct ipv6_pinfo *np = inet6_sk(sk);
@@ -497,7 +498,7 @@ static int tcp_v6_send_synack(struct sock *sk, struct request_sock *req)
 	if ((err = xfrm_lookup(sock_net(sk), &dst, &fl, sk, 0)) < 0)
 		goto done;
 
-	skb = tcp_make_synack(sk, dst, req);
+	skb = tcp_make_synack(sk, dst, req, rvp);
 	if (skb) {
 		struct tcphdr *th = tcp_hdr(skb);
 
@@ -1159,11 +1160,14 @@ static struct sock *tcp_v6_hnd_req(struct sock *sk,struct sk_buff *skb)
  */
 static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 {
+	struct tcp_extend_values tmp_ext;
+	struct tcp_options_received tmp_opt;
+	u8 *hash_location;
+	struct request_sock *req;
 	struct inet6_request_sock *treq;
 	struct ipv6_pinfo *np = inet6_sk(sk);
-	struct tcp_options_received tmp_opt;
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct request_sock *req = NULL;
+	struct dst_entry *dst = __sk_dst_get(sk);
 	__u32 isn = TCP_SKB_CB(skb)->when;
 #ifdef CONFIG_SYN_COOKIES
 	int want_cookie = 0;
@@ -1202,8 +1206,52 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	tcp_clear_options(&tmp_opt);
 	tmp_opt.mss_clamp = IPV6_MIN_MTU - sizeof(struct tcphdr) - sizeof(struct ipv6hdr);
 	tmp_opt.user_mss = tp->rx_opt.user_mss;
+	tcp_parse_options(skb, &tmp_opt, &hash_location, 0, dst);
 
-	tcp_parse_options(skb, &tmp_opt, 0);
+	if (tmp_opt.cookie_plus > 0 &&
+	    tmp_opt.saw_tstamp &&
+	    !tp->rx_opt.cookie_out_never &&
+	    (sysctl_tcp_cookie_size > 0 ||
+	     (tp->cookie_values != NULL &&
+	      tp->cookie_values->cookie_desired > 0))) {
+		u8 *c;
+		u32 *d;
+		u32 *mess = &tmp_ext.cookie_bakery[COOKIE_DIGEST_WORDS];
+		int l = tmp_opt.cookie_plus - TCPOLEN_COOKIE_BASE;
+
+		if (tcp_cookie_generator(&tmp_ext.cookie_bakery[0]) != 0)
+			goto drop_and_free;
+
+		/* Secret recipe starts with IP addresses */
+		d = &ipv6_hdr(skb)->daddr.s6_addr32[0];
+		*mess++ ^= *d++;
+		*mess++ ^= *d++;
+		*mess++ ^= *d++;
+		*mess++ ^= *d++;
+		d = &ipv6_hdr(skb)->saddr.s6_addr32[0];
+		*mess++ ^= *d++;
+		*mess++ ^= *d++;
+		*mess++ ^= *d++;
+		*mess++ ^= *d++;
+
+		/* plus variable length Initiator Cookie */
+		c = (u8 *)mess;
+		while (l-- > 0)
+			*c++ ^= *hash_location++;
+
+#ifdef CONFIG_SYN_COOKIES
+		want_cookie = 0;	/* not our kind of cookie */
+#endif
+		tmp_ext.cookie_out_never = 0; /* false */
+		tmp_ext.cookie_plus = tmp_opt.cookie_plus;
+	} else if (!tp->rx_opt.cookie_in_always) {
+		/* redundant indications, but ensure initialization. */
+		tmp_ext.cookie_out_never = 1; /* true */
+		tmp_ext.cookie_plus = 0;
+	} else {
+		goto drop_and_free;
+	}
+	tmp_ext.cookie_in_always = tp->rx_opt.cookie_in_always;
 
 	if (want_cookie && !tmp_opt.saw_tstamp)
 		tcp_clear_options(&tmp_opt);
@@ -1236,23 +1284,21 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 
 		isn = tcp_v6_init_sequence(skb);
 	}
-
 	tcp_rsk(req)->snt_isn = isn;
 
 	security_inet_conn_request(sk, skb, req);
 
-	if (tcp_v6_send_synack(sk, req))
-		goto drop;
+	if (tcp_v6_send_synack(sk, req,
+			       (struct request_values *)&tmp_ext) ||
+	    want_cookie)
+		goto drop_and_free;
 
-	if (!want_cookie) {
-		inet6_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);
-		return 0;
-	}
+	inet6_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);
+	return 0;
 
+drop_and_free:
+	reqsk_free(req);
 drop:
-	if (req)
-		reqsk_free(req);
-
 	return 0; /* don't send reset */
 }
 
@@ -1848,7 +1894,7 @@ static int tcp_v6_init_sock(struct sock *sk)
 	 */
 	tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
 	tp->snd_cwnd_clamp = ~0;
-	tp->mss_cache = 536;
+	tp->mss_cache = TCP_MSS_DEFAULT;
 
 	tp->reordering = sysctl_tcp_reordering;
 
@@ -1864,6 +1910,19 @@ static int tcp_v6_init_sock(struct sock *sk)
 	tp->af_specific = &tcp_sock_ipv6_specific;
 #endif
 
+	/* TCP Cookie Transactions */
+	if (sysctl_tcp_cookie_size > 0) {
+		/* Default, cookies without s_data_payload. */
+		tp->cookie_values =
+			kzalloc(sizeof(*tp->cookie_values),
+				sk->sk_allocation);
+		if (tp->cookie_values != NULL)
+			kref_init(&tp->cookie_values->kref);
+	}
+	/* Presumed zeroed, in order of appearance:
+	 *	cookie_in_always, cookie_out_never,
+	 *	s_data_constant, s_data_in, s_data_out
+	 */
 	sk->sk_sndbuf = sysctl_tcp_wmem[1];
 	sk->sk_rcvbuf = sysctl_tcp_rmem[1];
 

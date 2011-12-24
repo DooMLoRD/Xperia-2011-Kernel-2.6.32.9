@@ -12,3 +12,5 @@ wl1271-objs		= wl1271_main.o  wl1271_spi.o wl1271_cmd.o  \
 			  wl1271_ps.o    wl1271_acx.o wl1271_boot.o \
 			  wl1271_init.o  wl1271_debugfs.o
 obj-$(CONFIG_WL1271)	+= wl1271.o
+
+obj-$(CONFIG_WL12XX_PLATFORM_DATA)	+=  wl12xx_platform_data.o

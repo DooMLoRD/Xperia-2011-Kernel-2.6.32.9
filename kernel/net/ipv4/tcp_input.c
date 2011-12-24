@@ -77,10 +77,13 @@ int sysctl_tcp_window_scaling __read_mostly = 1;
 int sysctl_tcp_sack __read_mostly = 1;
 int sysctl_tcp_fack __read_mostly = 1;
 int sysctl_tcp_reordering __read_mostly = TCP_FASTRETRANS_THRESH;
+EXPORT_SYMBOL(sysctl_tcp_reordering);
 int sysctl_tcp_ecn __read_mostly = 2;
+EXPORT_SYMBOL(sysctl_tcp_ecn);
 int sysctl_tcp_dsack __read_mostly = 1;
 int sysctl_tcp_app_win __read_mostly = 31;
 int sysctl_tcp_adv_win_scale __read_mostly = 2;
+EXPORT_SYMBOL(sysctl_tcp_adv_win_scale);
 
 int sysctl_tcp_stdurg __read_mostly;
 int sysctl_tcp_rfc1337 __read_mostly;
@@ -140,7 +143,7 @@ static void tcp_measure_rcv_mss(struct sock *sk, const struct sk_buff *skb)
 		 * "len" is invariant segment length, including TCP header.
 		 */
 		len += skb->data - skb_transport_header(skb);
-		if (len >= TCP_MIN_RCVMSS + sizeof(struct tcphdr) ||
+		if (len >= TCP_MSS_DEFAULT + sizeof(struct tcphdr) ||
 		    /* If PSH is not set, packet should be
 		     * full sized, provided peer TCP is not badly broken.
 		     * This observation (if it is correct 8)) allows
@@ -411,11 +414,12 @@ void tcp_initialize_rcv_mss(struct sock *sk)
 	unsigned int hint = min_t(unsigned int, tp->advmss, tp->mss_cache);
 
 	hint = min(hint, tp->rcv_wnd / 2);
-	hint = min(hint, TCP_MIN_RCVMSS);
+	hint = min(hint, TCP_MSS_DEFAULT);
 	hint = max(hint, TCP_MIN_MSS);
 
 	inet_csk(sk)->icsk_ack.rcv_mss = hint;
 }
+EXPORT_SYMBOL(tcp_initialize_rcv_mss);
 
 /* Receiver "autotuning" code.
  *
@@ -2893,6 +2897,7 @@ void tcp_simple_retransmit(struct sock *sk)
 	}
 	tcp_xmit_retransmit_queue(sk);
 }
+EXPORT_SYMBOL(tcp_simple_retransmit);
 
 /* Process an event, which can update packets-in-flight not trivially.
  * Main goal of this function is to calculate new estimate for left_out,
@@ -3698,7 +3703,7 @@ old_ack:
  * the fast version below fails.
  */
 void tcp_parse_options(struct sk_buff *skb, struct tcp_options_received *opt_rx,
-		       int estab)
+		       u8 **hvpp, int estab,  struct dst_entry *dst)
 {
 	unsigned char *ptr;
 	struct tcphdr *th = tcp_hdr(skb);
@@ -3782,13 +3787,37 @@ void tcp_parse_options(struct sk_buff *skb, struct tcp_options_received *opt_rx,
 				 */
 				break;
 #endif
-			}
+			case TCPOPT_COOKIE:
+				/* This option is variable length.
+				 */
+				switch (opsize) {
+				case TCPOLEN_COOKIE_BASE:
+					/* not yet implemented */
+					break;
+				case TCPOLEN_COOKIE_PAIR:
+					/* not yet implemented */
+					break;
+				case TCPOLEN_COOKIE_MIN+0:
+				case TCPOLEN_COOKIE_MIN+2:
+				case TCPOLEN_COOKIE_MIN+4:
+				case TCPOLEN_COOKIE_MIN+6:
+				case TCPOLEN_COOKIE_MAX:
+					/* 16-bit multiple */
+					opt_rx->cookie_plus = opsize;
+					*hvpp = ptr;
+				default:
+					/* ignore option */
+					break;
+				};
+				break;
+			};
 
 			ptr += opsize-2;
 			length -= opsize;
 		}
 	}
 }
+EXPORT_SYMBOL(tcp_parse_options);
 
 static int tcp_parse_aligned_timestamp(struct tcp_sock *tp, struct tcphdr *th)
 {
@@ -3810,17 +3839,20 @@ static int tcp_parse_aligned_timestamp(struct tcp_sock *tp, struct tcphdr *th)
  * If it is wrong it falls back on tcp_parse_options().
  */
 static int tcp_fast_parse_options(struct sk_buff *skb, struct tcphdr *th,
-				  struct tcp_sock *tp)
+				  struct tcp_sock *tp, u8 **hvpp)
 {
-	if (th->doff == sizeof(struct tcphdr) >> 2) {
+	/* In the spirit of fast parsing, compare doff directly to constant
+	 * values.  Because equality is used, short doff can be ignored here.
+	 */
+	if (th->doff == (sizeof(*th) / 4)) {
 		tp->rx_opt.saw_tstamp = 0;
 		return 0;
 	} else if (tp->rx_opt.tstamp_ok &&
-		   th->doff == (sizeof(struct tcphdr)>>2)+(TCPOLEN_TSTAMP_ALIGNED>>2)) {
+		   th->doff == ((sizeof(*th) + TCPOLEN_TSTAMP_ALIGNED) / 4)) {
 		if (tcp_parse_aligned_timestamp(tp, th))
 			return 1;
 	}
-	tcp_parse_options(skb, &tp->rx_opt, 1);
+	tcp_parse_options(skb, &tp->rx_opt, hvpp, 1, NULL);
 	return 1;
 }
 
@@ -3859,6 +3891,7 @@ u8 *tcp_parse_md5sig_option(struct tcphdr *th)
 	}
 	return NULL;
 }
+EXPORT_SYMBOL(tcp_parse_md5sig_option);
 #endif
 
 static inline void tcp_store_ts_recent(struct tcp_sock *tp)
@@ -5070,10 +5103,12 @@ out:
 static int tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 			      struct tcphdr *th, int syn_inerr)
 {
+	u8 *hash_location;
 	struct tcp_sock *tp = tcp_sk(sk);
 
 	/* RFC1323: H1. Apply PAWS check first. */
-	if (tcp_fast_parse_options(skb, th, tp) && tp->rx_opt.saw_tstamp &&
+	if (tcp_fast_parse_options(skb, th, tp, &hash_location) &&
+	    tp->rx_opt.saw_tstamp &&
 	    tcp_paws_discard(sk, skb)) {
 		if (!th->rst) {
 			NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_PAWSESTABREJECTED);
@@ -5357,15 +5392,19 @@ discard:
 	__kfree_skb(skb);
 	return 0;
 }
+EXPORT_SYMBOL(tcp_rcv_established);
 
 static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 					 struct tcphdr *th, unsigned len)
 {
-	struct tcp_sock *tp = tcp_sk(sk);
+	u8 *hash_location;
 	struct inet_connection_sock *icsk = inet_csk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct dst_entry *dst = __sk_dst_get(sk);
+	struct tcp_cookie_values *cvp = tp->cookie_values;
 	int saved_clamp = tp->rx_opt.mss_clamp;
 
-	tcp_parse_options(skb, &tp->rx_opt, 0);
+	tcp_parse_options(skb, &tp->rx_opt, &hash_location, 0, dst);
 
 	if (th->ack) {
 		/* rfc793:
@@ -5462,6 +5501,31 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		 * Change state from SYN-SENT only after copied_seq
 		 * is initialized. */
 		tp->copied_seq = tp->rcv_nxt;
+
+		if (cvp != NULL &&
+		    cvp->cookie_pair_size > 0 &&
+		    tp->rx_opt.cookie_plus > 0) {
+			int cookie_size = tp->rx_opt.cookie_plus
+					- TCPOLEN_COOKIE_BASE;
+			int cookie_pair_size = cookie_size
+					     + cvp->cookie_desired;
+
+			/* A cookie extension option was sent and returned.
+			 * Note that each incoming SYNACK replaces the
+			 * Responder cookie.  The initial exchange is most
+			 * fragile, as protection against spoofing relies
+			 * entirely upon the sequence and timestamp (above).
+			 * This replacement strategy allows the correct pair to
+			 * pass through, while any others will be filtered via
+			 * Responder verification later.
+			 */
+			if (sizeof(cvp->cookie_pair) >= cookie_pair_size) {
+				memcpy(&cvp->cookie_pair[cvp->cookie_desired],
+				       hash_location, cookie_size);
+				cvp->cookie_pair_size = cookie_pair_size;
+			}
+		}
+
 		smp_mb();
 		tcp_set_state(sk, TCP_ESTABLISHED);
 
@@ -5831,14 +5895,4 @@ discard:
 	}
 	return 0;
 }
-
-EXPORT_SYMBOL(sysctl_tcp_ecn);
-EXPORT_SYMBOL(sysctl_tcp_reordering);
-EXPORT_SYMBOL(sysctl_tcp_adv_win_scale);
-EXPORT_SYMBOL(tcp_parse_options);
-#ifdef CONFIG_TCP_MD5SIG
-EXPORT_SYMBOL(tcp_parse_md5sig_option);
-#endif
-EXPORT_SYMBOL(tcp_rcv_established);
 EXPORT_SYMBOL(tcp_rcv_state_process);
-EXPORT_SYMBOL(tcp_initialize_rcv_mss);

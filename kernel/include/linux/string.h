@@ -63,9 +63,6 @@ extern char * strnchr(const char *, size_t, int);
 extern char * strrchr(const char *,int);
 #endif
 extern char * __must_check strstrip(char *);
-
-extern char *strim(char *);
-
 #ifndef __HAVE_ARCH_STRSTR
 extern char * strstr(const char *,const char *);
 #endif
@@ -106,6 +103,8 @@ extern int memcmp(const void *,const void *,__kernel_size_t);
 #ifndef __HAVE_ARCH_MEMCHR
 extern void * memchr(const void *,int,__kernel_size_t);
 #endif
+
+extern char *strim(char *);
 
 extern char *kstrdup(const char *s, gfp_t gfp);
 extern char *kstrndup(const char *s, size_t len, gfp_t gfp);

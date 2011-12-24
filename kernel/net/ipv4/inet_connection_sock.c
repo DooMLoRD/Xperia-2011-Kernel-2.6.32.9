@@ -81,7 +81,6 @@ int inet_csk_bind_conflict(const struct sock *sk,
 	}
 	return node != NULL;
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_bind_conflict);
 
 /* Obtain a reference to a local port for the given sock,
@@ -206,7 +205,6 @@ fail:
 	local_bh_enable();
 	return ret;
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_get_port);
 
 /*
@@ -299,7 +297,6 @@ out_err:
 	*err = error;
 	goto out;
 }
-
 EXPORT_SYMBOL(inet_csk_accept);
 
 /*
@@ -321,7 +318,6 @@ void inet_csk_init_xmit_timers(struct sock *sk,
 	setup_timer(&sk->sk_timer, keepalive_handler, (unsigned long)sk);
 	icsk->icsk_pending = icsk->icsk_ack.pending = 0;
 }
-
 EXPORT_SYMBOL(inet_csk_init_xmit_timers);
 
 void inet_csk_clear_xmit_timers(struct sock *sk)
@@ -334,21 +330,18 @@ void inet_csk_clear_xmit_timers(struct sock *sk)
 	sk_stop_timer(sk, &icsk->icsk_delack_timer);
 	sk_stop_timer(sk, &sk->sk_timer);
 }
-
 EXPORT_SYMBOL(inet_csk_clear_xmit_timers);
 
 void inet_csk_delete_keepalive_timer(struct sock *sk)
 {
 	sk_stop_timer(sk, &sk->sk_timer);
 }
-
 EXPORT_SYMBOL(inet_csk_delete_keepalive_timer);
 
 void inet_csk_reset_keepalive_timer(struct sock *sk, unsigned long len)
 {
 	sk_reset_timer(sk, &sk->sk_timer, jiffies + len);
 }
-
 EXPORT_SYMBOL(inet_csk_reset_keepalive_timer);
 
 struct dst_entry *inet_csk_route_req(struct sock *sk,
@@ -384,7 +377,6 @@ no_route:
 	IP_INC_STATS_BH(net, IPSTATS_MIB_OUTNOROUTES);
 	return NULL;
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_route_req);
 
 static inline u32 inet_synq_hash(const __be32 raddr, const __be16 rport,
@@ -426,7 +418,6 @@ struct request_sock *inet_csk_search_req(const struct sock *sk,
 
 	return req;
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_search_req);
 
 void inet_csk_reqsk_queue_hash_add(struct sock *sk, struct request_sock *req,
@@ -440,11 +431,11 @@ void inet_csk_reqsk_queue_hash_add(struct sock *sk, struct request_sock *req,
 	reqsk_queue_hash_req(&icsk->icsk_accept_queue, h, req, timeout);
 	inet_csk_reqsk_queue_added(sk, timeout);
 }
+EXPORT_SYMBOL_GPL(inet_csk_reqsk_queue_hash_add);
 
 /* Only thing we need from tcp.h */
 extern int sysctl_tcp_synack_retries;
 
-EXPORT_SYMBOL_GPL(inet_csk_reqsk_queue_hash_add);
 
 /* Decide when to expire the request and when to resend SYN-ACK */
 static inline void syn_ack_recalc(struct request_sock *req, const int thresh,
@@ -530,7 +521,7 @@ void inet_csk_reqsk_queue_prune(struct sock *parent,
 					       &expire, &resend);
 				if (!expire &&
 				    (!resend ||
-				     !req->rsk_ops->rtx_syn_ack(parent, req) ||
+				     !req->rsk_ops->rtx_syn_ack(parent, req, NULL) ||
 				     inet_rsk(req)->acked)) {
 					unsigned long timeo;
 
@@ -560,7 +551,6 @@ void inet_csk_reqsk_queue_prune(struct sock *parent,
 	if (lopt->qlen)
 		inet_csk_reset_keepalive_timer(parent, interval);
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_reqsk_queue_prune);
 
 struct sock *inet_csk_clone(struct sock *sk, const struct request_sock *req,
@@ -590,7 +580,6 @@ struct sock *inet_csk_clone(struct sock *sk, const struct request_sock *req,
 	}
 	return newsk;
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_clone);
 
 /*
@@ -621,7 +610,6 @@ void inet_csk_destroy_sock(struct sock *sk)
 	percpu_counter_dec(sk->sk_prot->orphan_count);
 	sock_put(sk);
 }
-
 EXPORT_SYMBOL(inet_csk_destroy_sock);
 
 int inet_csk_listen_start(struct sock *sk, const int nr_table_entries)
@@ -656,7 +644,6 @@ int inet_csk_listen_start(struct sock *sk, const int nr_table_entries)
 	__reqsk_queue_destroy(&icsk->icsk_accept_queue);
 	return -EADDRINUSE;
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_listen_start);
 
 /*
@@ -711,7 +698,6 @@ void inet_csk_listen_stop(struct sock *sk)
 	}
 	WARN_ON(sk->sk_ack_backlog);
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_listen_stop);
 
 void inet_csk_addr2sockaddr(struct sock *sk, struct sockaddr *uaddr)
@@ -723,7 +709,6 @@ void inet_csk_addr2sockaddr(struct sock *sk, struct sockaddr *uaddr)
 	sin->sin_addr.s_addr	= inet->daddr;
 	sin->sin_port		= inet->dport;
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_addr2sockaddr);
 
 #ifdef CONFIG_COMPAT
@@ -738,7 +723,6 @@ int inet_csk_compat_getsockopt(struct sock *sk, int level, int optname,
 	return icsk->icsk_af_ops->getsockopt(sk, level, optname,
 					     optval, optlen);
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_compat_getsockopt);
 
 int inet_csk_compat_setsockopt(struct sock *sk, int level, int optname,
@@ -752,6 +736,5 @@ int inet_csk_compat_setsockopt(struct sock *sk, int level, int optname,
 	return icsk->icsk_af_ops->setsockopt(sk, level, optname,
 					     optval, optlen);
 }
-
 EXPORT_SYMBOL_GPL(inet_csk_compat_setsockopt);
 #endif

@@ -420,8 +420,12 @@ static void xpad360w_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned cha
 
 static void xpad_do_submit_urb(struct work_struct *work)
 {
+	int retval;
 	struct usb_xpad *xpad = container_of(work, struct usb_xpad, submit_urb);
-	usb_submit_urb(xpad->irq_in, GFP_ATOMIC);
+	retval = usb_submit_urb(xpad->irq_in, GFP_ATOMIC);
+	if (retval)
+		err("%s - usb_submit_urb failed with result %d",
+		     __func__, retval);
 }
 
 static void xpad_irq_in(struct urb *urb)
@@ -639,6 +643,8 @@ struct xpad_led {
 
 static void xpad_send_led_command(struct usb_xpad *xpad, int command, int mutex)
 {
+	int retval;
+
 	if (command >= 0 && command < 14) {
 		if (mutex)
 			mutex_lock(&xpad->odata_mutex);
@@ -646,9 +652,12 @@ static void xpad_send_led_command(struct usb_xpad *xpad, int command, int mutex)
 		xpad->odata[1] = 0x03;
 		xpad->odata[2] = command;
 		xpad->irq_out->transfer_buffer_length = 3;
-		usb_submit_urb(xpad->irq_out, GFP_KERNEL);
+		retval = usb_submit_urb(xpad->irq_out, GFP_KERNEL);
 		if (mutex)
 			mutex_unlock(&xpad->odata_mutex);
+		if (retval)
+			err("%s - usb_submit_urb failed with result %d",
+			     __func__, retval);
 	} else if (command >= 0x40 && command <= 0x4F) {
 		if (mutex)
 			mutex_lock(&xpad->odata_mutex);
@@ -665,9 +674,12 @@ static void xpad_send_led_command(struct usb_xpad *xpad, int command, int mutex)
 		xpad->odata[10] = 0x00;
 		xpad->odata[11] = 0x00;
 		xpad->irq_out->transfer_buffer_length = 12;
-		usb_submit_urb(xpad->irq_out, GFP_KERNEL);
+		retval = usb_submit_urb(xpad->irq_out, GFP_KERNEL);
 		if (mutex)
 			mutex_unlock(&xpad->odata_mutex);
+		if (retval)
+			err("%s - usb_submit_urb failed with result %d",
+			     __func__, retval);
 	}
 }
 

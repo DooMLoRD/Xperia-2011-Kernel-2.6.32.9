@@ -116,8 +116,6 @@ static inline void addrconf_sysctl_unregister(struct inet6_dev *idev)
 static int __ipv6_regen_rndid(struct inet6_dev *idev);
 static int __ipv6_try_regen_rndid(struct inet6_dev *idev, struct in6_addr *tmpaddr);
 static void ipv6_regen_rndid(unsigned long data);
-
-static int desync_factor = MAX_DESYNC_FACTOR * HZ;
 #endif
 
 static int ipv6_generate_eui64(u8 *eui, struct net_device *dev);
@@ -401,15 +399,13 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 #endif
 
 #ifdef CONFIG_IPV6_PRIVACY
+	INIT_LIST_HEAD(&ndev->tempaddr_list);
 	setup_timer(&ndev->regen_timer, ipv6_regen_rndid, (unsigned long)ndev);
 	if ((dev->flags&IFF_LOOPBACK) ||
 	    dev->type == ARPHRD_TUNNEL ||
 	    dev->type == ARPHRD_TUNNEL6 ||
 	    dev->type == ARPHRD_SIT ||
 	    dev->type == ARPHRD_NONE) {
-		printk(KERN_INFO
-		       "%s: Disabled Privacy Extensions\n",
-		       dev->name);
 		ndev->cnf.use_tempaddr = -1;
 	} else {
 		in6_dev_hold(ndev);
@@ -678,8 +674,7 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 
 #ifdef CONFIG_IPV6_PRIVACY
 	if (ifa->flags&IFA_F_TEMPORARY) {
-		ifa->tmp_next = idev->tempaddr_list;
-		idev->tempaddr_list = ifa;
+		list_add(&ifa->tmp_list, &idev->tempaddr_list);
 		in6_ifa_hold(ifa);
 	}
 #endif
@@ -731,19 +726,12 @@ static void ipv6_del_addr(struct inet6_ifaddr *ifp)
 	write_lock_bh(&idev->lock);
 #ifdef CONFIG_IPV6_PRIVACY
 	if (ifp->flags&IFA_F_TEMPORARY) {
-		for (ifap = &idev->tempaddr_list; (ifa=*ifap) != NULL;
-		     ifap = &ifa->tmp_next) {
-			if (ifa == ifp) {
-				*ifap = ifa->tmp_next;
-				if (ifp->ifpub) {
-					in6_ifa_put(ifp->ifpub);
-					ifp->ifpub = NULL;
-				}
-				__in6_ifa_put(ifp);
-				ifa->tmp_next = NULL;
-				break;
-			}
+		list_del(&ifp->tmp_list);
+		if (ifp->ifpub) {
+			in6_ifa_put(ifp->ifpub);
+			ifp->ifpub = NULL;
 		}
+		__in6_ifa_put(ifp);
 	}
 #endif
 
@@ -836,12 +824,13 @@ static int ipv6_create_tempaddr(struct inet6_ifaddr *ifp, struct inet6_ifaddr *i
 {
 	struct inet6_dev *idev = ifp->idev;
 	struct in6_addr addr, *tmpaddr;
-	unsigned long tmp_prefered_lft, tmp_valid_lft, tmp_cstamp, tmp_tstamp;
+	unsigned long tmp_prefered_lft, tmp_valid_lft, tmp_tstamp, age;
 	unsigned long regen_advance;
 	int tmp_plen;
 	int ret = 0;
 	int max_addresses;
 	u32 addr_flags;
+	unsigned long now = jiffies;
 
 	write_lock(&idev->lock);
 	if (ift) {
@@ -886,15 +875,16 @@ retry:
 		goto out;
 	}
 	memcpy(&addr.s6_addr[8], idev->rndid, 8);
+	age = (now - ifp->tstamp) / HZ;
 	tmp_valid_lft = min_t(__u32,
 			      ifp->valid_lft,
-			      idev->cnf.temp_valid_lft);
+			      idev->cnf.temp_valid_lft + age);
 	tmp_prefered_lft = min_t(__u32,
 				 ifp->prefered_lft,
-				 idev->cnf.temp_prefered_lft - desync_factor / HZ);
+				 idev->cnf.temp_prefered_lft + age -
+				 idev->cnf.max_desync_factor);
 	tmp_plen = ifp->prefix_len;
 	max_addresses = idev->cnf.max_addresses;
-	tmp_cstamp = ifp->cstamp;
 	tmp_tstamp = ifp->tstamp;
 	spin_unlock_bh(&ifp->lock);
 
@@ -939,7 +929,7 @@ retry:
 	ift->ifpub = ifp;
 	ift->valid_lft = tmp_valid_lft;
 	ift->prefered_lft = tmp_prefered_lft;
-	ift->cstamp = tmp_cstamp;
+	ift->cstamp = now;
 	ift->tstamp = tmp_tstamp;
 	spin_unlock_bh(&ift->lock);
 
@@ -1632,7 +1622,8 @@ static void ipv6_regen_rndid(unsigned long data)
 
 	expires = jiffies +
 		idev->cnf.temp_prefered_lft * HZ -
-		idev->cnf.regen_max_retry * idev->cnf.dad_transmits * idev->nd_parms->retrans_time - desync_factor;
+		idev->cnf.regen_max_retry * idev->cnf.dad_transmits * idev->nd_parms->retrans_time -
+		idev->cnf.max_desync_factor * HZ;
 	if (time_before(expires, jiffies)) {
 		printk(KERN_WARNING
 			"ipv6_regen_rndid(): too short regeneration interval; timer disabled for %s.\n",
@@ -1973,34 +1964,62 @@ ok:
 #ifdef CONFIG_IPV6_PRIVACY
 			read_lock_bh(&in6_dev->lock);
 			/* update all temporary addresses in the list */
-			for (ift=in6_dev->tempaddr_list; ift; ift=ift->tmp_next) {
-				/*
-				 * When adjusting the lifetimes of an existing
-				 * temporary address, only lower the lifetimes.
-				 * Implementations must not increase the
-				 * lifetimes of an existing temporary address
-				 * when processing a Prefix Information Option.
-				 */
+			list_for_each_entry(ift, &in6_dev->tempaddr_list,
+					    tmp_list) {
+				int age, max_valid, max_prefered;
+
 				if (ifp != ift->ifpub)
 					continue;
 
+				/*
+				 * RFC 4941 section 3.3:
+				 * If a received option will extend the lifetime
+				 * of a public address, the lifetimes of
+				 * temporary addresses should be extended,
+				 * subject to the overall constraint that no
+				 * temporary addresses should ever remain
+				 * "valid" or "preferred" for a time longer than
+				 * (TEMP_VALID_LIFETIME) or
+				 * (TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR),
+				 * respectively.
+				 */
+				age = (now - ift->cstamp) / HZ;
+				max_valid = in6_dev->cnf.temp_valid_lft - age;
+				if (max_valid < 0)
+					max_valid = 0;
+
+				max_prefered = in6_dev->cnf.temp_prefered_lft -
+					       in6_dev->cnf.max_desync_factor -
+					       age;
+				if (max_prefered < 0)
+					max_prefered = 0;
+
+				if (valid_lft > max_valid)
+					valid_lft = max_valid;
+
+				if (prefered_lft > max_prefered)
+					prefered_lft = max_prefered;
+
 				spin_lock(&ift->lock);
 				flags = ift->flags;
-				if (ift->valid_lft > valid_lft &&
-				    ift->valid_lft - valid_lft > (jiffies - ift->tstamp) / HZ)
-					ift->valid_lft = valid_lft + (jiffies - ift->tstamp) / HZ;
-				if (ift->prefered_lft > prefered_lft &&
-				    ift->prefered_lft - prefered_lft > (jiffies - ift->tstamp) / HZ)
-					ift->prefered_lft = prefered_lft + (jiffies - ift->tstamp) / HZ;
+				ift->valid_lft = valid_lft;
+				ift->prefered_lft = prefered_lft;
+				ift->tstamp = now;
+				if (prefered_lft > 0)
+					ift->flags &= ~IFA_F_DEPRECATED;
+
 				spin_unlock(&ift->lock);
 				if (!(flags&IFA_F_TENTATIVE))
 					ipv6_ifa_notify(0, ift);
 			}
 
-			if (create && in6_dev->cnf.use_tempaddr > 0) {
+			if ((create || list_empty(&in6_dev->tempaddr_list)) && in6_dev->cnf.use_tempaddr > 0) {
 				/*
-				 * When a new public address is created as described in [ADDRCONF],
-				 * also create a new temporary address.
+				 * When a new public address is created as
+				 * described in [ADDRCONF], also create a new
+				 * temporary address. Also create a temporary
+				 * address if it's enabled but no temporary
+				 * address currently exists.
 				 */
 				read_unlock_bh(&in6_dev->lock);
 				ipv6_create_tempaddr(ifp, NULL);
@@ -2678,9 +2697,10 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		in6_dev_put(idev);
 
 	/* clear tempaddr list */
-	while ((ifa = idev->tempaddr_list) != NULL) {
-		idev->tempaddr_list = ifa->tmp_next;
-		ifa->tmp_next = NULL;
+	while (!list_empty(&idev->tempaddr_list)) {
+		ifa = list_first_entry(&idev->tempaddr_list,
+				       struct inet6_ifaddr, tmp_list);
+		list_del(&ifa->tmp_list);
 		ifa->dead = 1;
 		write_unlock_bh(&idev->lock);
 		spin_lock_bh(&ifa->lock);

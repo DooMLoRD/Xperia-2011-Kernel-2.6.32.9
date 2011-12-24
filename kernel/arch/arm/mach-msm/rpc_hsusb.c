@@ -655,7 +655,8 @@ static int hsusb_chg_get_property(struct power_supply *bat_ps,
 		    hsusb_chg_state.connected == USB_CHG_TYPE__WALLCHARGER)
 			val->intval = 1;
 		else if (bat_ps->type == POWER_SUPPLY_TYPE_USB &&
-			 hsusb_chg_state.connected == USB_CHG_TYPE__SDP)
+			 hsusb_chg_state.connected == USB_CHG_TYPE__SDP &&
+			 hsusb_chg_state.usb_chg_current_ma != 0)
 			val->intval = 1;
 		else
 			val->intval = 0;

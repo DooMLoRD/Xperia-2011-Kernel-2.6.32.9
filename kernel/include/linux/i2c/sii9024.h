@@ -1,6 +1,8 @@
 #ifndef _SII9024_H_
 #define _SII9024_H_
 
+#include <linux/switch.h>
+
 #define HDMI_SII_GPIO_HPD	93
 #define HDMI_SII_GPIO_POWER	102
 #define HDMI_SII_GPIO_RESET	105
@@ -24,6 +26,7 @@ struct sii9024_platform_data {
 	int lcdc_border_clr;
 	int lcdc_underflow_clr;
 	int lcdc_hsync_skew;
+	struct switch_dev hdmi_switch;
 };
 
 struct hdmi_sii_state {
@@ -31,6 +34,7 @@ struct hdmi_sii_state {
 	int hpd;
 	int power;
 	int reset;
+	struct sii9024_platform_data *pdata;
 };
 
 #endif

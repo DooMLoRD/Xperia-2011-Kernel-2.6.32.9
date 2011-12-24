@@ -15,8 +15,6 @@
 #ifndef __LINUX_USB_GADGET_H
 #define __LINUX_USB_GADGET_H
 
-#include <linux/slab.h>
-
 struct usb_ep;
 
 /**
@@ -72,7 +70,7 @@ struct usb_ep;
  * Bulk endpoints can use any size buffers, and can also be used for interrupt
  * transfers. interrupt-only endpoints can be much less functional.
  *
- * NOTE:  this is analogous to 'struct urb' on the host side, except that
+ * NOTE:  this is analagous to 'struct urb' on the host side, except that
  * it's thinner and promotes more pre-allocation.
  */
 
@@ -269,7 +267,7 @@ static inline void usb_ep_free_request(struct usb_ep *ep,
  *
  * Control endpoints ... after getting a setup() callback, the driver queues
  * one response (even if it would be zero length).  That enables the
- * status ack, after transferring data as specified in the response.  Setup
+ * status ack, after transfering data as specified in the response.  Setup
  * functions may return negative error codes to generate protocol stalls.
  * (Note that some USB device controllers disallow protocol stall responses
  * in some cases.)  When control responses are deferred (the response is
@@ -452,6 +450,7 @@ struct usb_gadget_ops {
  *	only supports HNP on a different root port.
  * @b_hnp_enable: OTG device feature flag, indicating that the A-Host
  *	enabled HNP support.
+ * @host_request: A flag set by user when wishes to take up host role.
  * @name: Identifies the controller hardware type.  Used in diagnostics
  *	and sometimes configuration.
  * @dev: Driver model state for this abstract device.
@@ -501,7 +500,7 @@ static inline struct usb_gadget *dev_to_usb_gadget(struct device *dev)
 }
 
 /* iterates the non-control endpoints; 'tmp' is a struct usb_ep pointer */
-#define gadget_for_each_ep(tmp, gadget) \
+#define gadget_for_each_ep(tmp,gadget) \
 	list_for_each_entry(tmp, &(gadget)->ep_list, ep_list)
 
 
@@ -787,10 +786,6 @@ struct usb_gadget_driver {
 	struct device_driver	driver;
 };
 
-
-
-/*-------------------------------------------------------------------------*/
-
 /* driver modules register and unregister, as usual.
  * these calls must be made in a context that can sleep.
  *
@@ -895,8 +890,8 @@ static inline void usb_free_descriptors(struct usb_descriptor_header **v)
 /* utility wrapping a simple endpoint selection policy */
 
 extern struct usb_ep *usb_ep_autoconfig(struct usb_gadget *,
-			struct usb_endpoint_descriptor *);
+			struct usb_endpoint_descriptor *) __devinit;
 
-extern void usb_ep_autoconfig_reset(struct usb_gadget *);
+extern void usb_ep_autoconfig_reset(struct usb_gadget *) __devinit;
 
 #endif /* __LINUX_USB_GADGET_H */

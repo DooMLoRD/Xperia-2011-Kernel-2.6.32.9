@@ -88,6 +88,7 @@ __inline__ void ip_send_check(struct iphdr *iph)
 	iph->check = 0;
 	iph->check = ip_fast_csum((unsigned char *)iph, iph->ihl);
 }
+EXPORT_SYMBOL(ip_send_check);
 
 int __ip_local_out(struct sk_buff *skb)
 {
@@ -171,7 +172,6 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 	/* Send it out. */
 	return ip_local_out(skb);
 }
-
 EXPORT_SYMBOL_GPL(ip_build_and_send_pkt);
 
 static inline int ip_finish_output2(struct sk_buff *skb)
@@ -395,6 +395,7 @@ no_route:
 	kfree_skb(skb);
 	return -EHOSTUNREACH;
 }
+EXPORT_SYMBOL(ip_queue_xmit);
 
 
 static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
@@ -685,7 +686,6 @@ fail:
 	IP_INC_STATS(dev_net(dev), IPSTATS_MIB_FRAGFAILS);
 	return err;
 }
-
 EXPORT_SYMBOL(ip_fragment);
 
 int
@@ -704,6 +704,7 @@ ip_generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk
 	}
 	return 0;
 }
+EXPORT_SYMBOL(ip_generic_getfrag);
 
 static inline __wsum
 csum_page(struct page *page, int offset, int copy)
@@ -1432,7 +1433,3 @@ void __init ip_init(void)
 	igmp_mc_proc_init();
 #endif
 }
-
-EXPORT_SYMBOL(ip_generic_getfrag);
-EXPORT_SYMBOL(ip_queue_xmit);
-EXPORT_SYMBOL(ip_send_check);

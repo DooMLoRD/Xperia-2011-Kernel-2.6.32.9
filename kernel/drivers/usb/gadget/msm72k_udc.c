@@ -5,7 +5,7 @@
  * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  * Author: Mike Lockwood <lockwood@android.com>
  *         Brian Swetland <swetland@google.com>
- * Copyright (C) 2010 Sony Ericsson Mobile Communications AB.
+ * Copyright (C) 2010-2011 Sony Ericsson Mobile Communications AB.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -1424,8 +1424,8 @@ static irqreturn_t usb_interrupt(int irq, void *data)
 		ui->usb_state = USB_STATE_SUSPENDED;
 		ui->flags = USB_FLAG_SUSPEND;
 		spin_unlock_irqrestore(&ui->lock, flags);
-
-		ui->driver->suspend(&ui->gadget);
+		if (ui->driver)
+			ui->driver->suspend(&ui->gadget);
 		queue_work(ui->wq, &ui->work);
 #ifdef CONFIG_USB_OTG
 		/* notify otg for
