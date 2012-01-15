@@ -30,10 +30,10 @@
 
 #define DEF_FREQUENCY_UP_THRESHOLD		(80)
 #define DEF_FREQUENCY_DOWN_THRESHOLD		(45)
-#define DEFAULT_SLEEP_MAX_FREQ 245760
-#define DEFAULT_SLEEP_MIN_FREQ 122880
-#define DEFAULT_SLEEP_PREV_FREQ 122880 //This is so that if there are any issues resulting in sleep_prev_freq getting set, there will be a backup freq
-#define DEFAULT_PREV_MAX 1024000
+#define DEFAULT_SLEEP_MAX_FREQ 249600
+#define DEFAULT_SLEEP_MIN_FREQ 134400
+#define DEFAULT_SLEEP_PREV_FREQ 134400 //This is so that if there are any issues resulting in sleep_prev_freq getting set, there will be a backup freq
+#define DEFAULT_PREV_MAX 1017600
 static unsigned int suspended;
 static unsigned int sleep_max_freq=DEFAULT_SLEEP_MAX_FREQ;
 static unsigned int sleep_min_freq=DEFAULT_SLEEP_MIN_FREQ;
