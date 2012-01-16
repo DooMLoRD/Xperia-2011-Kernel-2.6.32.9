@@ -59,11 +59,8 @@ static unsigned int enabled = 0;
 #define DEFAULT_MIN_SAMPLE_TIME 50000;
 static unsigned long min_sample_time;
 
-#define FREQ_THRESHOLD 1017600;
-static unsigned int freq_threshld;
-
-#define RESUME_SPEED 1017600;
-static unsigned int resum_speed;
+#define FREQ_THRESHOLD 1024000;
+#define RESUME_SPEED 1024000;
 
 static int cpufreq_governor_interactivex(struct cpufreq_policy *policy,
 		unsigned int event);
@@ -202,7 +199,7 @@ static void cpufreq_interactivex_freq_change_time_work(struct work_struct *work)
 	unsigned int cpu;
 	unsigned int newtarget;
 	cpumask_t tmp_mask = work_cpumask;
-	newtarget = freq_threshld;
+	newtarget = FREQ_THRESHOLD;
 
 	for_each_cpu(cpu, tmp_mask) {
 	  if (!suspended) {
@@ -255,7 +252,7 @@ static void interactivex_suspend(int suspend)
 {
 	unsigned int max_speed;
 
-	max_speed = resum_speed;
+	max_speed = RESUME_SPEED;
 
 	if (!enabled) return;
         if (!suspend) { // resume at max speed:
@@ -287,11 +284,6 @@ static int cpufreq_governor_interactivex(struct cpufreq_policy *new_policy,
 		unsigned int event)
 {
 	int rc;
-	unsigned int min_freq = ~0;
-	unsigned int max_freq = 0;
-	unsigned int i;
-	struct cpufreq_frequency_table *freq_table;
-
 	switch (event) {
 	case CPUFREQ_GOV_START:
 		if (!cpu_online(new_policy->cpu))
@@ -315,19 +307,6 @@ static int cpufreq_governor_interactivex(struct cpufreq_policy *new_policy,
 		enabled = 1;
         	register_early_suspend(&interactivex_power_suspend);
         	pr_info("[imoseyon] interactiveX active\n");
-		freq_table = cpufreq_frequency_get_table(new_policy->cpu);
-		for (i = 0; (freq_table[i].frequency != CPUFREQ_TABLE_END); i++) {
-			unsigned int freq = freq_table[i].frequency;
-			if (freq == CPUFREQ_ENTRY_INVALID) {
-				continue;
-			}
-			if (freq < min_freq)	
-				min_freq = freq;
-			if (freq > max_freq)
-				max_freq = freq;
-		}
-		resum_speed = freq_table[(i-1)/2].frequency > min_freq ? freq_table[(i-1)/2].frequency : max_freq;		//Value in midrange of available CPU frequencies if sufficient number of freq bins available
-		freq_threshld = max_freq;
 		break;
 
 	case CPUFREQ_GOV_STOP:
@@ -361,8 +340,6 @@ static int __init cpufreq_interactivex_init(void)
 	unsigned int i;
 	struct timer_list *t;
 	min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
-	resum_speed = RESUME_SPEED;
-	freq_threshld = FREQ_THRESHOLD;
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
