@@ -771,7 +771,10 @@ static int do_send_key(struct fsg_common *common)
 				common->fsg->bulk_out,
 				bh->outreq,
 				&bh->outreq_busy,
-				&bh->state);
+				&bh->state)
+			/* Don't know what to do if
+			 * common->fsg is NULL */
+			return -EIO;
 		common->next_buffhd_to_fill = bh->next;
 		while (bh->state != BUF_STATE_FULL) {
 			rc = sleep_thread(common);
@@ -3345,6 +3348,11 @@ buffhds_first_it:
 
 	wake_up_process(common->thread_task);
 
+#ifdef CONFIG_USB_MARLIN_SCSI_EXTENSIONS
+	rc = mldd_init();
+	if (rc != 0)
+		goto error_release;
+#endif
 	return common;
 
 
@@ -3363,6 +3371,9 @@ static void fsg_common_release(struct kref *ref)
 {
 	struct fsg_common *common = container_of(ref, struct fsg_common, ref);
 
+#ifdef CONFIG_USB_MARLIN_SCSI_EXTENSIONS
+	mldd_fin();
+#endif
 	/* If the thread isn't already dead, tell it to exit now */
 	if (common->state != FSG_STATE_TERMINATED) {
 		raise_exception(common, FSG_STATE_EXIT);
@@ -3428,9 +3439,6 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 	usb_free_descriptors(fsg->function.hs_descriptors);
 	switch_dev_unregister(&fsg->sdev);
 	kfree(fsg);
-#ifdef CONFIG_USB_MARLIN_SCSI_EXTENSIONS
-	mldd_fin();
-#endif
 }
 
 
@@ -3514,12 +3522,6 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 {
 	struct fsg_dev *fsg;
 	int rc;
-
-#ifdef CONFIG_USB_MARLIN_SCSI_EXTENSIONS
-	rc = mldd_init();
-	if (rc != 0)
-		return rc;
-#endif
 
 	fsg = kzalloc(sizeof *fsg, GFP_KERNEL);
 	if (unlikely(!fsg))

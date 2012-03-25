@@ -48,7 +48,7 @@ void kgsl_pwrctrl_pwrlevel_change(struct kgsl_device *device,
 					bus_freq);
 			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
 				"kgsl_3d", pwr->pwrlevels[pwr->active_pwrlevel].
-				bus_freq);
+				bus_freq/1000);
 		}
 		KGSL_PWR_WARN(device, "kgsl pwr level changed to %d\n",
 					  pwr->active_pwrlevel);
@@ -365,7 +365,7 @@ void kgsl_pwrctrl_axi(struct kgsl_device *device, int state)
 				"axi on, device %d\n", device->id);
 			pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
 				"kgsl_3d", pwr->pwrlevels[pwr->active_pwrlevel].
-				bus_freq);
+				bus_freq/1000);
 			if (pwr->ebi1_clk) {
 				clk_enable(pwr->ebi1_clk);
 				clk_set_rate(pwr->ebi1_clk,

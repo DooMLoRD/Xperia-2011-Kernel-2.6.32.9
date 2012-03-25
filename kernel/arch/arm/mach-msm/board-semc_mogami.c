@@ -186,7 +186,7 @@
 #endif /* CONFIG_FB_MSM_HDMI_SII9024A_PANEL */
 #define MSM_GPU_PHYS_SIZE       SZ_4M
 #define MSM_PMEM_CAMERA_SIZE    0x3200000
-#define MSM_PMEM_ADSP_SIZE      0x1800000
+#define MSM_PMEM_ADSP_SIZE      0x1000000
 #define PMEM_KERNEL_EBI1_SIZE   0x600000
 
 #define PMIC_GPIO_INT		27
@@ -4628,8 +4628,8 @@ static void __init msm7x30_fixup(struct machine_desc *desc, struct tag *tags,
 #define MSM_BANK0_BASE			PHYS_OFFSET
 #define MSM_BANK0_SIZE			0x03C00000
 
-#define MSM_BANK1_BASE			0x06E00000
-#define MSM_BANK1_SIZE			0x09200000
+#define MSM_BANK1_BASE			0x07400000
+#define MSM_BANK1_SIZE			0x08C00000
 
 #define MSM_BANK2_BASE			0x40000000
 #define MSM_BANK2_SIZE			0x10000000

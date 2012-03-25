@@ -885,6 +885,7 @@ static unsigned int adreno_isidle(struct kgsl_device *device)
 	struct adreno_ringbuffer *rb = &adreno_dev->ringbuffer;
 	unsigned int rbbm_status;
 
+	WARN_ON(!(rb->flags & KGSL_FLAGS_STARTED));
 	if (rb->flags & KGSL_FLAGS_STARTED) {
 		/* Is the ring buffer is empty? */
 		GSL_RB_GET_READPTR(rb, &rb->rptr);
@@ -896,8 +897,8 @@ static unsigned int adreno_isidle(struct kgsl_device *device)
 				status = true;
 		}
 	} else {
-		KGSL_DRV_ERR(device, "ringbuffer not started\n");
-		BUG();
+		/* if the ringbuffer isn't started we are VERY idle */
+		status = true;
 	}
 	return status;
 }
@@ -1025,7 +1026,7 @@ static int kgsl_check_interrupt_timestamp(struct kgsl_device *device,
 			kgsl_sharedmem_readl(&device->memstore, &ref_ts,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts));
 			mb();
-			if (timestamp_cmp(ref_ts, timestamp)) {
+			if (timestamp_cmp(ref_ts, timestamp) >= 0) {
 				kgsl_sharedmem_writel(&device->memstore,
 				KGSL_DEVICE_MEMSTORE_OFFSET(ref_wait_ts),
 				timestamp);
@@ -1084,9 +1085,7 @@ static int adreno_waittimestamp(struct kgsl_device *device,
 	if (msecs == -1)
 		msecs = adreno_dev->wait_timeout;
 
-	if (timestamp != adreno_dev->ringbuffer.timestamp &&
-		timestamp_cmp(timestamp,
-		adreno_dev->ringbuffer.timestamp)) {
+	if (timestamp_cmp(timestamp, adreno_dev->ringbuffer.timestamp) > 0) {
 		KGSL_DRV_ERR(device, "Cannot wait for invalid ts: %x, "
 			"rb->timestamp: %x\n",
 			timestamp, adreno_dev->ringbuffer.timestamp);

@@ -3251,7 +3251,7 @@ void __init tcp_init(void)
 }
 
 static int tcp_is_local(struct net *net, __be32 addr) {
-	struct rtable *rt;
+	struct rtable *rt = NULL;
 	struct flowi fl = { .nl_u = { .ip4_u = { .daddr = addr } } };
 	ip_route_output_key(net, &rt, &fl);
 	if (IS_ERR_OR_NULL(rt))

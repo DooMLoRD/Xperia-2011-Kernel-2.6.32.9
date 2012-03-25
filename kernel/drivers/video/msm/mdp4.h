@@ -392,6 +392,14 @@ int mdp4_overlay_format2pipe(struct mdp4_overlay_pipe *pipe);
 int mdp4_overlay_get(struct fb_info *info, struct mdp_overlay *req);
 int mdp4_overlay_set(struct fb_info *info, struct mdp_overlay *req);
 int mdp4_overlay_unset(struct fb_info *info, int ndx);
+void mdp4_overlay_dtv_wait_for_ov(struct msm_fb_data_type *mfd,
+	struct mdp4_overlay_pipe *pipe);
+void mdp4_overlay_dtv_vsync_push(struct msm_fb_data_type *mfd,
+	struct mdp4_overlay_pipe *pipe);
+void mdp4_overlay_dtv_ov_done_push(struct msm_fb_data_type *mfd,
+	struct mdp4_overlay_pipe *pipe);
+int mdp4_overlay_play_wait(struct fb_info *info,
+	struct msmfb_overlay_data *req);
 int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 				struct file **pp_src_file);
 int mdp4_overlay_refresh(struct fb_info *info, int ndx);
@@ -406,6 +414,7 @@ void mdp4_overlay0_done_lcdc(void);
 void mdp4_overlay0_done_mddi(void);
 void mdp4_dma_p_done_mddi(void);
 void mdp4_dma_s_done_mddi(void);
+void mdp4_external_vsync_dtv(void);
 void mdp4_overlay1_done_dtv(void);
 void mdp4_overlay1_done_atv(void);
 void mdp4_mddi_overlay_restore(void);

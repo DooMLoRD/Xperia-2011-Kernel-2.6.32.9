@@ -1558,6 +1558,31 @@ uint32 tile_mem_size(struct mdp4_overlay_pipe *pipe, struct tile_desc *tp)
 	return ((row_num_w * row_num_h * tile_w * tile_h) + 8191) & ~8191;
 }
 
+int mdp4_overlay_play_wait(struct fb_info *info, struct msmfb_overlay_data *req)
+{
+	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+	struct mdp4_overlay_pipe *pipe;
+
+	if (mfd == NULL)
+		return -ENODEV;
+
+	if (!mfd->panel_power_on) /* suspended */
+		return -EPERM;
+
+	pipe = mdp4_overlay_ndx2pipe(req->id);
+
+	if (down_interruptible(&mfd->dma->ov_sem))
+		return -EINTR;
+
+#ifdef CONFIG_FB_MSM_DTV
+	mdp4_overlay_dtv_vsync_push(mfd, pipe);
+#endif
+
+	up(&mfd->dma->ov_sem);
+
+	return 0;
+}
+
 int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 		struct file **pp_src_file)
 {
@@ -1628,8 +1653,13 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req,
 	if (pipe->mixer_num == MDP4_MIXER1) {
 		ctrl->mixer1_played++;
 		/* enternal interface */
-		if (ctrl->panel_mode & MDP4_PANEL_DTV)
+		if (ctrl->panel_mode & MDP4_PANEL_DTV) {
+#ifdef CONFIG_FB_MSM_DTV
+			mdp4_overlay_dtv_ov_done_push(mfd, pipe);
+#else
 			mdp4_overlay_reg_flush(pipe, 1);
+#endif
+		}
 		else if (ctrl->panel_mode & MDP4_PANEL_ATV)
 			mdp4_overlay_reg_flush(pipe, 1);
 	} else {

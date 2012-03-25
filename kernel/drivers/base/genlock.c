@@ -39,6 +39,7 @@ struct genlock {
 	wait_queue_head_t queue;  /* Holding pen for processes pending lock */
 	struct file *file;        /* File structure for exported lock */
 	int state;                /* Current state of the lock */
+	struct kref refcount;
 };
 
 struct genlock_handle {
@@ -50,13 +51,46 @@ struct genlock_handle {
 };
 
 /*
+ * Create a spinlock to protect against a race condition when a lock gets
+ * released while another process tries to attach it
+ */
+
+static DEFINE_SPINLOCK(genlock_file_lock);
+
+static void genlock_destroy(struct kref *kref)
+{
+	struct genlock *lock = container_of(kref, struct genlock,
+			refcount);
+
+	/*
+	 * Clear the private data for the file descriptor in case the fd is
+	 * still active after the lock gets released
+	 */
+
+	spin_lock(&genlock_file_lock);
+	if (lock->file)
+		lock->file->private_data = NULL;
+	spin_unlock(&genlock_file_lock);
+
+	kfree(lock);
+}
+
+/*
  * Release the genlock object. Called when all the references to
  * the genlock file descriptor are released
  */
 
 static int genlock_release(struct inode *inodep, struct file *file)
 {
-	kfree(file->private_data);
+	struct genlock *lock = file->private_data;
+	/*
+	 * Clear the refrence back to this file structure to avoid
+	 * somehow reusing the lock after the file has been destroyed
+	 */
+
+	if (lock)
+		lock->file = NULL;
+
 	return 0;
 }
 
@@ -98,6 +132,7 @@ struct genlock *genlock_create_lock(struct genlock_handle *handle)
 
 	/* Attach the new lock to the handle */
 	handle->lock = lock;
+	kref_init(&lock->refcount);
 
 	return lock;
 }
@@ -112,7 +147,7 @@ static int genlock_get_fd(struct genlock *lock)
 {
 	int ret;
 
-	if (!lock->file)
+	if (lock->file == NULL)
 		return -EINVAL;
 
 	ret = get_unused_fd_flags(0);
@@ -133,6 +168,7 @@ static int genlock_get_fd(struct genlock *lock)
 struct genlock *genlock_attach_lock(struct genlock_handle *handle, int fd)
 {
 	struct file *file;
+	struct genlock *lock;
 
 	if (handle->lock != NULL)
 		return ERR_PTR(-EINVAL);
@@ -141,9 +177,24 @@ struct genlock *genlock_attach_lock(struct genlock_handle *handle, int fd)
 	if (file == NULL)
 		return ERR_PTR(-EBADF);
 
-	handle->lock = file->private_data;
+	/*
+	 * take a spinlock to avoid a race condition if the lock is
+	 * released and then attached
+	 */
 
-	return handle->lock;
+	spin_lock(&genlock_file_lock);
+	lock = file->private_data;
+	spin_unlock(&genlock_file_lock);
+
+	fput(file);
+
+	if (lock == NULL)
+		return ERR_PTR(-EINVAL);
+
+	handle->lock = lock;
+	kref_get(&lock->refcount);
+
+	return lock;
 }
 EXPORT_SYMBOL(genlock_attach_lock);
 
@@ -420,7 +471,7 @@ void genlock_release_lock(struct genlock_handle *handle)
 	}
 	spin_unlock_irqrestore(&handle->lock->lock, flags);
 
-	fput(handle->lock->file);
+	kref_put(&handle->lock->refcount, genlock_destroy);
 	handle->lock = NULL;
 	handle->active = 0;
 }
@@ -577,7 +628,8 @@ static int genlock_dev_release(struct inode *inodep, struct file *file)
 {
 	struct genlock_handle *handle = file->private_data;
 
-	genlock_put_handle(handle);
+	genlock_release_lock(handle);
+	kfree(handle);
 
 	return 0;
 }

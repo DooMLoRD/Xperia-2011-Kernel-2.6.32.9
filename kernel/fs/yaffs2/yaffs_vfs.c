@@ -1817,6 +1817,10 @@ static int yaffs_symlink(struct inode *dir, struct dentry *dentry,
 				YAFFS_MAX_NAME_LENGTH)
 		return -ENAMETOOLONG;
 
+	if (strnlen(symname, YAFFS_MAX_ALIAS_LENGTH + 1) >
+				YAFFS_MAX_ALIAS_LENGTH)
+		return -ENAMETOOLONG;
+
 	dev = yaffs_inode_to_obj(dir)->my_dev;
 	yaffs_gross_lock(dev);
 	obj = yaffs_create_symlink(yaffs_inode_to_obj(dir), dentry->d_name.name,

@@ -160,6 +160,7 @@ struct msm_fb_data_type {
 #endif
 	u32 mdp_fb_page_protection;
 	boolean dma_update_flag;
+	u32 ov_start, ov_end;
 };
 
 struct dentry *msm_fb_get_debugfs_root(void);

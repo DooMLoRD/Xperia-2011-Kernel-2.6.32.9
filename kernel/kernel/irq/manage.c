@@ -545,25 +545,10 @@ static int irq_thread(void *data)
 
 		atomic_inc(&desc->threads_active);
 
-		spin_lock_irq(&desc->lock);
-		if (unlikely(desc->status & IRQ_DISABLED)) {
-			/*
-			 * CHECKME: We might need a dedicated
-			 * IRQ_THREAD_PENDING flag here, which
-			 * retriggers the thread in check_irq_resend()
-			 * but AFAICT IRQ_PENDING should be fine as it
-			 * retriggers the interrupt itself --- tglx
-			 */
-			desc->status |= IRQ_PENDING;
-			spin_unlock_irq(&desc->lock);
-		} else {
-			spin_unlock_irq(&desc->lock);
+		action->thread_fn(action->irq, action->dev_id);
 
-			action->thread_fn(action->irq, action->dev_id);
-
-			if (oneshot)
-				irq_finalize_oneshot(action->irq, desc);
-		}
+		if (oneshot)
+			irq_finalize_oneshot(action->irq, desc);
 
 		wake = atomic_dec_and_test(&desc->threads_active);
 

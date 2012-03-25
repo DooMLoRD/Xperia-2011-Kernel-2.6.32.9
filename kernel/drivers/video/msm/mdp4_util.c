@@ -394,6 +394,18 @@ irqreturn_t mdp4_isr(int irq, void *ptr)
 			break;
 
 		panel = mdp4_overlay_panel_list();
+#ifdef CONFIG_FB_MSM_DTV
+		if (isr & INTR_EXTERNAL_VSYNC) {
+			dma = &dma_e_data;
+			spin_lock(&mdp_spin_lock);
+			mdp_intr_mask &= ~INTR_EXTERNAL_VSYNC;
+			outp32(MDP_INTR_ENABLE, mdp_intr_mask);
+			dma->waiting = FALSE;
+			if (panel & MDP4_PANEL_DTV)
+				mdp4_external_vsync_dtv();
+			spin_unlock(&mdp_spin_lock);
+		}
+#endif
 		if (isr & INTR_DMA_P_DONE) {
 			mdp4_stat.intr_dma_p++;
 			dma = &dma2_data;

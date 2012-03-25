@@ -548,6 +548,11 @@ u32 vcd_free_one_buffer_internal(
 
 	VCD_FAILED_RETURN(rc, "Invalid buffer type provided");
 
+	if (buf_pool->count == 0)
+		rc = VCD_ERR_BAD_STATE;
+	VCD_FAILED_RETURN(rc, "Can't free buffer: %s buffer pool is empty!",
+			(buffer_type == VCD_BUFFER_INPUT) ? "input" : "output");
+
 	first_frm_recvd &= cctxt->status.mask;
 	if (first_frm_recvd) {
 		VCD_MSG_ERROR(
