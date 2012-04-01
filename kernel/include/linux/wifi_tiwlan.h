@@ -23,7 +23,7 @@
 #define WMPA_SECTION_SIZE_0	(WMPA_NUMBER_OF_BUFFERS * 64)
 #define WMPA_SECTION_SIZE_1	(WMPA_NUMBER_OF_BUFFERS * 256)
 #define WMPA_SECTION_SIZE_2	(WMPA_NUMBER_OF_BUFFERS * 2048)
-
+/*
 struct wifi_platform_data {
         int (*set_power)(int val);
         int (*set_reset)(int val);
@@ -31,5 +31,5 @@ struct wifi_platform_data {
 	void *(*mem_prealloc)(int section, unsigned long size);
 	u8 mac_addr[6];
 };
-
+*/
 #endif
