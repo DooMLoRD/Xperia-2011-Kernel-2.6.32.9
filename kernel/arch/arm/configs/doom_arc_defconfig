@@ -1157,6 +1157,7 @@ CONFIG_WLAN=y
 # CONFIG_LIBRA_SDIOIF is not set
 CONFIG_WL12XX_PLATFORM_DATA=y
 # CONFIG_BCM4329 is not set
+# CONFIG_BCMDHD is not set
 
 #
 # Enable WiMAX (Networking options) to see the WiMAX drivers
