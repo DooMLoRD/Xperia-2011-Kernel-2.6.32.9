@@ -201,6 +201,9 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 	cpu_work = &per_cpu(cpufreq_work, policy->cpu);
 	INIT_WORK(&cpu_work->work, set_cpu_work);
 #endif
+	policy->min = 249600;
+	policy->max = 1017600;
+
 	return 0;
 }
 
