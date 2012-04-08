@@ -273,6 +273,15 @@ config MACH_SEMC_COCONUT
 	help
 	  Support for the SonyEricsson Coconut devices.
 
+config MACH_SEMC_STRAWBERRY
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select TI1271
+	default n
+	bool "SonyEricsson Strawberry"
+	help
+	  Support for the SonyEricsson Strawberry devices.
+
 config MACH_SEMC_AKANE
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
@@ -292,6 +301,16 @@ config MACH_SEMC_AZUSA
 	bool "SonyEricsson Azusa"
 	help
 	  Support for the SonyEricsson Azusa devices.
+
+config MACH_SEMC_AZAMI
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select TI1271
+	select SUPPORT_ALIEN_USB_CHARGER
+	default y
+	bool "SonyEricsson Azami"
+	help
+	  Support for the Sony Ericsson Azami devices.
 
 config MACH_SEMC_HAIDA
 	depends on ARCH_MSM7X30
