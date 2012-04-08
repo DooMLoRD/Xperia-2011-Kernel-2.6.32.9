@@ -56,6 +56,7 @@
 #define MAX_AXI_KHZ 192000
 #define SEMC_ACPU_MIN_UV_MV 750U
 #define SEMC_ACPU_MAX_UV_MV 1525U
+#define OVERCLOCK_CPU_LOW 0 /* set to 0 to enable 2.0 GHz */
 
 struct clock_state {
 	struct clkctl_acpu_speed	*current_speed;
@@ -97,7 +98,7 @@ static struct cpufreq_frequency_table freq_table[] = {
 	{ 14, 1401600 },
 	{ 15, 1516800 },
 	{ 16, 1612800 },
-#if 1
+#if OVERCLOCK_CPU_LOW
 	{ 17, CPUFREQ_TABLE_END },
 #else
 	{ 17, 1708800 },
@@ -143,7 +144,7 @@ static struct clkctl_acpu_speed acpu_freq_tbl[] = {
 	{ 1401600, PLL_2,   3, 0,  UINT_MAX, 1250, VDD_RAW(1250) },
 	{ 1516800, PLL_2,   3, 0,  UINT_MAX, 1300, VDD_RAW(1300) },
 	{ 1612800, PLL_2,   3, 0,  UINT_MAX, 1300, VDD_RAW(1300) },
-#if 1
+#if OVERCLOCK_CPU_LOW
 	{ 0 }
 #else
 	{ 1708800, PLL_2,   3, 0,  UINT_MAX, 1350, VDD_RAW(1350) },
