@@ -142,6 +142,8 @@
 
 #define USB_VREG_MV		3500	/* usb voltage regulator mV */
 
+#define OVERCLOCK_GPU 0 /* set to 1 to enable GPU overclock */
+
 /* GPIO hardware device identification */
 enum board_hwid {
 	BOARD_HWID_UNK,
@@ -2124,10 +2126,13 @@ static struct kgsl_platform_data kgsl_pdata = {
 	.max_grp2d_freq = 0,
 	.min_grp2d_freq = 0,
 	.set_grp2d_async = NULL,	/* HW workaround, run Z180 SYNC @ 192 MHZ */
-	.max_grp3d_freq = 364800000,
-//	.max_grp3d_freq = 245760000,
+#if OVERCLOCK_GPU
+	.max_grp3d_freq = 364800000, /* GPU OC */
 	.min_grp3d_freq = 249600000,	
-//	.min_grp3d_freq = 192000000,
+#else
+	.max_grp3d_freq = 245760000, /* NO-GPU OC */
+	.min_grp3d_freq = 192000000,
+#endif
 	.set_grp3d_async = set_grp3d_async,
 	.imem_clk_name = "imem_clk",
 	.grp3d_clk_name = "grp_clk",
