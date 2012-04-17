@@ -191,7 +191,7 @@ static struct vfe31_cmd_type vfe31_cmd[] = {
 			V31_SYNC_TIMER_OFF},
 /*105*/	{V31_ASYNC_TIMER_SETTING, V31_ASYNC_TIMER_LEN, V31_ASYNC_TIMER_OFF},
 		{V31_LIVESHOT},
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 		{V31_START_RAW_CAPTURE, 0, 0},
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 };
@@ -677,9 +677,9 @@ static int vfe31_config_axi(int mode, struct axidata *ad, uint32_t *ao)
 		*p1 = (regp1->paddr + regp1->info.y_off);
 		}
 		break;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	case CAMIF_TO_OUTPUT_CONTINUOUS_RAW: {
-		CDBG("DEBBUG: ad->bufnum1 = %d \n",ad->bufnum1);
+		CDBG("DEBBUG: ad->bufnum1 =%d",	ad->bufnum1);
 		if (ad->bufnum2 != 3)
 			return -EINVAL;
 
@@ -967,10 +967,10 @@ static int vfe31_stop_recording(void){
 	return 0;
 }
 
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 static int vfe31_start_raw_capture(void)
 {
-	CDBG("vfe31_start_raw_capture mode %d \n",vfe31_ctrl->operation_mode);
+	CDBG("vfe31_start_raw_capture mode %d", vfe31_ctrl->operation_mode);
 	vfe31_start_common();
 	return 0;
 }
@@ -1227,7 +1227,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 		vfe31_update();
 		break;
 	case V31_CAPTURE:
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 		snapshot_cnt = 1;
 #else
 		if (copy_from_user(&snapshot_cnt, (void __user *)(cmd->value),
@@ -1238,7 +1238,7 @@ static int vfe31_proc_general(struct msm_vfe31_cmd *cmd)
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 		rc = vfe31_capture(snapshot_cnt);
 		break;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	case V31_START_RAW_CAPTURE:
 		rc = vfe31_start_raw_capture();
 		break;
@@ -1956,7 +1956,7 @@ static int vfe31_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 		kfree(axio);
 	}
 		break;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	case CMD_AXI_CFG_CONT_RAW_RGB: {
 		struct axidata *axid;
 		uint32_t *axio = NULL;
@@ -2089,7 +2089,7 @@ static void vfe31_process_reg_update_irq(void)
 				24 * (vfe31_ctrl->outpath.out2.ch1));
 			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
 				20 + 24 * (vfe31_ctrl->outpath.out2.ch1));
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 			msm_io_w(1, vfe31_ctrl->vfebase + VFE_REG_UPDATE_CMD);
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 			/* Mask with 0x7 to extract the pixel pattern*/
@@ -2127,7 +2127,7 @@ static void vfe31_process_reg_update_irq(void)
 				24 * (vfe31_ctrl->outpath.out2.ch1));
 			temp = msm_io_r(vfe31_ctrl->vfebase + V31_AXI_OUT_OFF +
 				20 + 24 * (vfe31_ctrl->outpath.out2.ch1));
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 			msm_io_w(1, vfe31_ctrl->vfebase + VFE_REG_UPDATE_CMD);
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 			/* Mask with 0x7 to extract the pixel pattern*/
@@ -2314,7 +2314,7 @@ static void vfe31_process_axi_halt_irq(void)
 static void vfe31_process_camif_sof_irq(void)
 {
 	uint32_t  temp;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	struct msm_sync *sync = (struct msm_sync *)vfe_syncdata;
 	sync->validframe = 1;
 	if ((vfe31_ctrl->operation_mode == 3)
@@ -2493,7 +2493,7 @@ static void vfe31_process_output_path_irq_0(void)
 			if (vfe31_ctrl->operation_mode & 1) {
 				/* will add message for multi-shot. */
 				vfe31_ctrl->outpath.out0.capture_cnt--;
-#ifndef CONFIG_MACH_SEMC_ZEUS
+#if !defined(CONFIG_MACH_SEMC_ZEUS)
 				vfe_send_outmsg(MSG_ID_OUTPUT_T, pyaddr,
 					pcbcraddr);
 #endif /* CONFIG_MACH_SEMC_ZEUS */
@@ -2514,7 +2514,7 @@ static void vfe31_process_output_path_irq_1(void)
 {
 	uint32_t ping_pong;
 	uint32_t pyaddr, pcbcraddr;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	struct msm_sync *sync = (struct msm_sync *)vfe_syncdata;
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 	/* this must be snapshot main image output. */
@@ -2555,7 +2555,7 @@ static void vfe31_process_output_path_irq_1(void)
 				vfe31_ctrl->outpath.out1.free_buf.cbcr_off);
 				vfe31_ctrl->outpath.out1.free_buf.available = 0;
 			}
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 			CDBG("vfe31_process_output_path_irq_1 %d %d\n",sync->validframe,vfe31_ctrl->operation_mode);
 			if ((vfe31_ctrl->operation_mode != 3 ) ||
 				(sync->validframe == 1)) {

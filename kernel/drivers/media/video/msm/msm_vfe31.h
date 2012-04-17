@@ -300,7 +300,7 @@ enum  VFE_STATE {
 #define V31_SYNC_TIMER_SETTING    104
 #define V31_ASYNC_TIMER_SETTING   105
 #define V31_LIVESHOT              106
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 #define V31_START_RAW_CAPTURE	  107
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 #define V31_CAMIF_OFF             0x000001E4

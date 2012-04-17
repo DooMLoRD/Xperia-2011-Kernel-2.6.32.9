@@ -425,6 +425,13 @@ static int ovm7692_sensor_config(void __user *argp)
 	case CFG_SET_FPS:
 		rc = ovm7692_set_framerate(cfg_data.cfg.fps.f_mult);
 		CDBG("ovm7692_sensor_config CFG_SET_FPS rc = %d\n", (int)rc);
+
+		/* Setting the new framerate can fail due of unsupported FPS.
+		 * In this case we should only treat it as a warning and let to
+		 * finish the rest of work correctly */
+		if (rc)
+			rc = 0;
+
 		break;
 	default:
 		rc = -EINVAL;

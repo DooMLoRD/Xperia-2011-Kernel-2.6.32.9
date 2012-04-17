@@ -97,9 +97,9 @@ int load_565rle_image(char *filename)
 			memset16(bits, ptr[1], n << 1);
 		} else {
 			unsigned int widepixel = ptr[1];
-			widepixel = (widepixel & 0xf800) << (19-11) |
+			widepixel = (widepixel & 0x001f) << (19-0) |
 					(widepixel & 0x07e0) << (10-5) |
-					(widepixel & 0x001f) << (3-0);
+					(widepixel & 0xf800) >> (11-3);
 			memset32(bits, widepixel, n << 2);
 		}
 		bits += n * fb_depth(info);

@@ -24,6 +24,7 @@
 #include <asm/mach-types.h>
 #include <linux/mutex.h>
 #include <linux/power_supply.h>
+#include <linux/delay.h>
 
 static struct msm_rpc_endpoint *usb_ep;
 static struct msm_rpc_endpoint *chg_ep;
@@ -419,6 +420,8 @@ int msm_chg_usb_i_is_available(uint32_t sample)
 			__func__, rc);
 	} else
 		pr_debug("msm_chg_usb_i_is_available(%u)\n", sample);
+
+	usleep(3000);
 #endif
 
 	return rc;

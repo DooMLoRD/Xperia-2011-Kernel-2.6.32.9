@@ -309,7 +309,8 @@ static int bmp180_perform_resume(struct bmp180_data *dd)
 		if ((dd->pdata) && (dd->pdata->gpio_setup))
 			rc = dd->pdata->gpio_setup(dd->power);
 
-		schedule_delayed_work(&dd->work_data, dd->delay_jiffies);
+		if (dd->ip_dev->users)
+			schedule_delayed_work(&dd->work_data, dd->delay_jiffies);
 	}
 	mutex_unlock(&dd->power_lock);
 	return rc;
@@ -434,7 +435,6 @@ static void bmp180_work_f(struct work_struct *work)
 	mutex_lock(&dd->power_lock);
 
 	if (dd->power) {
-		schedule_delayed_work(&dd->work_data, dd->delay_jiffies);
 
 		err = bmp180_get_temperature(dd, &temperature);
 		if (!err)
@@ -445,6 +445,8 @@ static void bmp180_work_f(struct work_struct *work)
 			input_report_abs(dd->ip_dev, ABS_PRESSURE, pressure);
 			input_sync(dd->ip_dev);
 		}
+		if (dd->ip_dev->users)
+			schedule_delayed_work(&dd->work_data, dd->delay_jiffies);
 	}
 	mutex_unlock(&dd->power_lock);
 }

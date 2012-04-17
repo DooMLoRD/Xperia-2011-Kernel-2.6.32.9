@@ -58,11 +58,11 @@
 #include "f_mtp.c"
 #endif
 
-#if CONFIG_USB_ANDROID_DIAG
+#ifdef CONFIG_USB_ANDROID_DIAG
 #include "f_diag.c"
 #endif
 
-#if CONFIG_USB_F_SERIAL
+#ifdef CONFIG_USB_F_SERIAL
 #include "u_serial.c"
 #include "f_serial.c"
 #endif
@@ -71,11 +71,11 @@
 #include "f_acm.c"
 #endif
 
-#if CONFIG_USB_ANDROID_ACCESSORY
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
 #include "f_accessory.c"
 #endif
 
-#if CONFIG_USB_ANDROID_RNDIS
+#ifdef CONFIG_USB_ANDROID_RNDIS
 #define USB_ETH_RNDIS y
 #include "f_rndis.c"
 #include "rndis.c"
@@ -213,7 +213,7 @@ static void android_work(struct work_struct *data)
 
 /*-------------------------------------------------------------------------*/
 /* Supported functions initialization */
-#if CONFIG_USB_ANDROID_DIAG
+#ifdef CONFIG_USB_ANDROID_DIAG
 /* DIAG */
 
 static int diag_function_init(struct android_usb_function *f,
@@ -241,7 +241,7 @@ static struct android_usb_function diag_function = {
 };
 #endif
 
-#if CONFIG_USB_ANDROID_ADB
+#ifdef CONFIG_USB_ANDROID_ADB
 static int adb_function_init(struct android_usb_function *f, struct usb_composite_dev *cdev)
 {
 	return adb_setup();
@@ -432,7 +432,7 @@ static struct android_usb_function ptp_function = {
 #endif
 
 
-#if CONFIG_USB_ANDROID_RNDIS
+#ifdef CONFIG_USB_ANDROID_RNDIS
 struct rndis_function_config {
 	u8      ethaddr[ETH_ALEN];
 	u32     vendorID;
@@ -747,7 +747,7 @@ static struct android_usb_function cdrom_function = {
 };
 #endif
 
-#if CONFIG_USB_ANDROID_ACCESSORY
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
 static int accessory_function_init(struct android_usb_function *f,
 					struct usb_composite_dev *cdev)
 {
@@ -798,16 +798,16 @@ static struct android_usb_function *supported_functions[] = {
 	&nmea_function,
 	&modem_function,
 #endif
-#if CONFIG_USB_ANDROID_DIAG
+#ifdef CONFIG_USB_ANDROID_DIAG
 	&diag_function,
 #endif
 #if 0
 	&acm_function,
 #endif
-#if CONFIG_USB_ANDROID_RNDIS
+#ifdef CONFIG_USB_ANDROID_RNDIS
 	&rndis_function,
 #endif
-#if CONFIG_USB_ANDROID_ACCESSORY
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
 	&accessory_function,
 #endif
 	NULL

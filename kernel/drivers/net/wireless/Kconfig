@@ -484,9 +484,9 @@ config LIBRA_SDIOIF
 	  A driver for Qualcomm WLAN SDIO Libra chipset.
 
 config SEMC_ZEUS_WLAN
-	depends on MACH_SEMC_ZEUS && (!BCM4329 || !WIFI_CONTROL_FUNC)
+	depends on (MACH_SEMC_ZEUS) && (!BCM4329 || !WIFI_CONTROL_FUNC)
 	bool "SEMC Zeus TI WL1271 WiFi device"
-	default y if MACH_SEMC_ZEUS
+	default y if (MACH_SEMC_ZEUS)
 	help
 	  Enable kernel-side support for the Ti 1271 Wlan on the SEMC
 	  Zeus Platform

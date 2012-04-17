@@ -23,7 +23,7 @@
 #include <linux/hrtimer.h>
 #include <mach/pmic.h>
 #include <mach/camera.h>
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 #include <linux/delay.h>
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 #include <mach/gpio.h>
@@ -114,7 +114,7 @@ int msm_camera_flash_pmic(
 	return rc;
 }
 
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 /**
  * Access GPIO
 */
@@ -197,7 +197,7 @@ int32_t msm_camera_flash_set_led_state(
 		rc = msm_camera_flash_pwm(&fdata->flash_src->_fsrc.pwm_src,
 			led_state);
 		break;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	case MSM_CAMERA_FLASH_SRC_LED:
 			rc = msm_camera_flash_gpio(fdata->flash_src->_fsrc.gpio_led_src,
 				led_state);

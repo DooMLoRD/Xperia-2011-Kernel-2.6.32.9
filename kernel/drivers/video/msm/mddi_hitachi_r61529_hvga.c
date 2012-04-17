@@ -19,6 +19,14 @@
 #include <linux/autoconf.h>
 #include <linux/mddi_hitachi_r61529_hvga.h>
 
+#if defined(CONFIG_MACH_SEMC_SATSUMA) || defined(CONFIG_MACH_SEMC_SMULTRON)
+	#define REFRESH_RATE 6700
+#elif defined(CONFIG_MACH_SEMC_MANGO)
+	#define REFRESH_RATE 6200
+#else
+	#define REFRESH_RATE 6500
+#endif
+
 /* Internal version number */
 #define MDDI_DRIVER_VERSION 0x0004
 
@@ -574,7 +582,7 @@ static int mddi_hitachi_lcd_probe(struct platform_device *pdev)
 		rd->pdata->panel_data->panel_info.mddi.vdopkt =
 						MDDI_DEFAULT_PRIM_PIX_ATTR;
 		rd->pdata->panel_data->panel_info.lcd.vsync_enable = TRUE;
-		rd->pdata->panel_data->panel_info.lcd.refx100 = 6500;
+		rd->pdata->panel_data->panel_info.lcd.refx100 = REFRESH_RATE;
 		rd->pdata->panel_data->panel_info.lcd.v_back_porch = 8;
 		rd->pdata->panel_data->panel_info.lcd.v_front_porch = 8;
 		rd->pdata->panel_data->panel_info.lcd.v_pulse_width = 0;

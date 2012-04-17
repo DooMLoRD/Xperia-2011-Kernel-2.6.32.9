@@ -124,7 +124,7 @@ static ssize_t kgsl_ib_dump_read(
 	int i, count = kgsl_ib_size, remaining, pos = 0, tot = 0, ss;
 	struct kgsl_device *device = file->private_data;
 	const int rowc = 32;
-	unsigned int pt_base, ib_memsize;
+	unsigned int pt_base;
 	uint8_t *base_addr;
 	char linebuf[80];
 
@@ -132,8 +132,8 @@ static ssize_t kgsl_ib_dump_read(
 		return 0;
 
 	kgsl_regread(device, MH_MMU_PT_BASE, &pt_base);
-	base_addr = kgsl_sharedmem_convertaddr(device, pt_base, kgsl_ib_base,
-		&ib_memsize);
+	base_addr = adreno_convertaddr(device, pt_base, kgsl_ib_base,
+		kgsl_ib_size*sizeof(uint32_t));
 
 	if (!base_addr)
 		return 0;
@@ -141,8 +141,8 @@ static ssize_t kgsl_ib_dump_read(
 	pr_info("%s ppos=%ld, buff_count=%d, count=%d\n", __func__, (long)*ppos,
 		buff_count, count);
 	ss = snprintf(linebuf, sizeof(linebuf), "IB: base=%08x(%08x"
-		"), size=%d, memsize=%d\n", kgsl_ib_base,
-		(uint32_t)base_addr, kgsl_ib_size, ib_memsize);
+		"), size=%d\n", kgsl_ib_base,
+		(uint32_t)base_addr, kgsl_ib_size);
 	if (*ppos == 0) {
 		if (copy_to_user(buff, linebuf, ss+1))
 			return -EFAULT;

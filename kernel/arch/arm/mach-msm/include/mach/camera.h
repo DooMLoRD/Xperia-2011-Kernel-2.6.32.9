@@ -180,7 +180,7 @@ struct msm_sensor_ctrl {
 	int (*s_init)(const struct msm_camera_sensor_info *);
 	int (*s_release)(void);
 	int (*s_config)(void __user *);
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	int (*s_get_capture_started)(void);
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 };
@@ -274,7 +274,7 @@ struct msm_sync {
 	spinlock_t pmem_stats_spinlock;
 	spinlock_t abort_pict_lock;
 
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	uint8_t validframe;
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 };

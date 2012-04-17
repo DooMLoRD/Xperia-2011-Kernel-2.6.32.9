@@ -193,7 +193,7 @@ static struct msm_fb_panel_data *get_panel_info(void)
 	novatek_panel_data.panel_info.clk_min =  190000000;
 	novatek_panel_data.panel_info.clk_max =  200000000;
 	novatek_panel_data.panel_info.mddi.vdopkt = MDDI_DEFAULT_PRIM_PIX_ATTR;
-	novatek_panel_data.panel_info.lcd.refx100 = 6164;
+	novatek_panel_data.panel_info.lcd.refx100 = 6100;
 	novatek_panel_data.panel_info.lcd.v_back_porch = 14;
 	novatek_panel_data.panel_info.lcd.v_front_porch = 2;
 	novatek_panel_data.panel_info.lcd.v_pulse_width = 0;

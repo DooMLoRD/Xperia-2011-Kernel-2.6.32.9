@@ -43,6 +43,7 @@ enum vib_task {
 };
 
 static struct work_struct vibrator_work;
+static struct workqueue_struct *vibrator_workqueue;
 static struct hrtimer vibe_timer;
 static spinlock_t vibe_lock;
 static enum vib_task vibe_state;
@@ -151,7 +152,7 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	}
 	spin_unlock_irqrestore(&vibe_lock, flags);
 
-	schedule_work(&vibrator_work);
+	queue_work(vibrator_workqueue, &vibrator_work);
 }
 
 static int vibrator_get_time(struct timed_output_dev *dev)
@@ -184,7 +185,7 @@ static int vibrator_get_time(struct timed_output_dev *dev)
 
 static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)
 {
-	schedule_work(&vibrator_work);
+	queue_work(vibrator_workqueue, &vibrator_work);
 	return HRTIMER_NORESTART;
 }
 
@@ -197,6 +198,12 @@ static struct timed_output_dev pmic_vibrator = {
 void __init msm_init_pmic_vibrator(void)
 {
 	INIT_WORK(&vibrator_work, update_vibrator);
+
+	vibrator_workqueue = create_workqueue("vibrator_workqueue");
+	if (vibrator_workqueue == NULL) {
+		printk(KERN_ERR "vibrator_workqueue=NULL\n");
+		return;
+	}
 
 	spin_lock_init(&vibe_lock);
 	vibe_state = 0;

@@ -2885,7 +2885,6 @@ static int init_thread(void* data)
 		}
 	}
 	ret = seix006_update_scene(seix006_ctrl->scene);
-	ret = seix006_update_focus_mode(seix006_ctrl->focus_mode);
 	seix006_ctrl->init_complete = 1;
 
 	up(&seix006_sem);

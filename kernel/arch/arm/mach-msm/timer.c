@@ -392,6 +392,13 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 		get_cpu_var(msm_active_clock) = clock;
 		put_cpu_var(msm_active_clock);
 		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
+
+		if (get_irq_chip(clock->irq.irq) &&
+			get_irq_chip(clock->irq.irq)->unmask) {
+			get_irq_chip(clock->irq.irq)->unmask(
+				clock->irq.irq);
+		}
+
 		if (clock != &msm_clocks[MSM_CLOCK_GPT])
 			writel(TIMER_ENABLE_EN,
 				msm_clocks[MSM_CLOCK_GPT].regbase +
@@ -406,7 +413,16 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
 		clock_state->stopped_tick =
 			msm_read_timer_count(clock, LOCAL_TIMER) +
 			clock_state->sleep_offset;
+		writel(0, clock->regbase + TIMER_MATCH_VAL);
+
+		if (get_irq_chip(clock->irq.irq) &&
+		    get_irq_chip(clock->irq.irq)->mask) {
+			get_irq_chip(clock->irq.irq)->mask(
+			clock->irq.irq);
+		}
+
 		writel(0, clock->regbase + TIMER_ENABLE);
+
 		if (clock != &msm_clocks[MSM_CLOCK_GPT]) {
 			gpt_state->in_sync = 0;
 			writel(0, msm_clocks[MSM_CLOCK_GPT].regbase +
@@ -1024,7 +1040,7 @@ static void __init msm_timer_init(void)
 		if (res)
 			printk(KERN_ERR "msm_timer_init: setup_irq "
 			       "failed for %s\n", cs->name);
-
+		get_irq_chip(clock->irq.irq)->mask(clock->irq.irq);
 		clockevents_register_device(ce);
 	}
 }

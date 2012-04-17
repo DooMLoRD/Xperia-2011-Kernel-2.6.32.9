@@ -14,6 +14,12 @@
 #include "msm_fb_panel.h"
 #include "mddi_nt_panel.h"
 
+#ifdef CONFIG_MACH_SEMC_URUSHI
+	#define REFRESH_RATE 5900
+#else
+	#define REFRESH_RATE 6000
+#endif
+
 static const struct novatek_reg_set novatek_init_regs[] = {
 	{ 0, 0}
 };
@@ -194,7 +200,7 @@ static struct msm_fb_panel_data *get_panel_info(void)
 	novatek_panel_data.panel_info.bl_min = 1;
 	novatek_panel_data.panel_info.fb_num = 2;
 	novatek_panel_data.panel_info.mddi.vdopkt = MDDI_DEFAULT_PRIM_PIX_ATTR;
-	novatek_panel_data.panel_info.lcd.refx100 = 6000;
+	novatek_panel_data.panel_info.lcd.refx100 = REFRESH_RATE;
 	novatek_panel_data.panel_info.lcd.v_back_porch = 10;
 	novatek_panel_data.panel_info.lcd.v_front_porch = 4;
 	novatek_panel_data.panel_info.lcd.v_pulse_width = 0;

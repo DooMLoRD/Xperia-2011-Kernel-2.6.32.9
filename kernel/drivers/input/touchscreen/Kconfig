@@ -612,7 +612,7 @@ config TOUCHSCREEN_CY8C_TS
 
 config TOUCHSCREEN_CY8CTMA300
 	default y
-	depends on MACH_SEMC_ZEUS && SPI
+	depends on (MACH_SEMC_ZEUS) && SPI
         tristate "Cypress CY8CTMA300 hardware"
         help
           Capactive touchscreen for SEMC devices using new Cypress hardware.

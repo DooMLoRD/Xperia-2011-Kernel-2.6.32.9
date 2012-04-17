@@ -890,7 +890,7 @@ static int msm_divert_frame(struct msm_sync *sync,
 	return 0;
 }
 
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 static int msm_divert_snapshot(struct msm_sync *sync,
 		struct msm_vfe_resp *data,
 		struct msm_stats_event_ctrl *se)
@@ -1051,7 +1051,7 @@ static int msm_get_stats(struct msm_sync *sync, void __user *arg)
 					__func__, __LINE__);
 					rc = msm_divert_frame(sync, data, &se);
 					sync->pp_frame_avail = 0;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 			} else if ((sync->pp_mask & (PP_SNAP|PP_RAW_SNAP)) &&
 				  (data->type == VFE_MSG_SNAPSHOT ||
 				   data->type == VFE_MSG_OUTPUT_S)) {
@@ -1469,7 +1469,7 @@ static int msm_frame_axi_cfg(struct msm_sync *sync,
 			return -EINVAL;
 		}
 		break;
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	case CMD_AXI_CFG_CONT_RAW_RGB:
 		pmem_type = MSM_PMEM_PREVIEW;
 		axi_data.bufnum2 =
@@ -1748,7 +1748,7 @@ static int msm_axi_config(struct msm_sync *sync, void __user *arg)
 	case CMD_AXI_CFG_PREVIEW:
 	case CMD_AXI_CFG_SNAP:
 	case CMD_RAW_PICT_AXI_CFG:
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	case CMD_AXI_CFG_CONT_RAW_RGB:
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 		return msm_frame_axi_cfg(sync, &cfgcmd);
@@ -2567,7 +2567,7 @@ static void msm_vfe_sync(struct msm_vfe_resp *vdata,
 				__func__);
 			sync->pp_snap = qcmd;
 			spin_unlock_irqrestore(&pp_snap_spinlock, flags);
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 			break;
 		}
 
@@ -2578,7 +2578,7 @@ static void msm_vfe_sync(struct msm_vfe_resp *vdata,
 			if (atomic_read(&qcmd->on_heap))
 				atomic_add(1, &qcmd->on_heap);
 			msm_enqueue(&sync->pict_q, &qcmd->list_pict);
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 		} else {
 		    return;
 #endif /* CONFIG_MACH_SEMC_ZEUS */

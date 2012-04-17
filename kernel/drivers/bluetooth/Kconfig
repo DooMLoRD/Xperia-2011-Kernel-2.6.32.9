@@ -224,7 +224,7 @@ config MSM_BT_POWER
 
 config SEMC_BT_ZEUS
 	bool "SEMC Zeus BT device"
-	depends on MACH_SEMC_ZEUS
+	depends on (MACH_SEMC_ZEUS)
 	default y
 	select BT_HCIUART_H4
 	select BT_HCIUART_LL

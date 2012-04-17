@@ -4,6 +4,7 @@
 #include <asm/mach-types.h>
 #include "keypad-zeus.h"
 
+#ifdef CONFIG_INPUT_JOYSTICK
 static struct gpio_event_input_info keypad_gpio_info = {
 	.info.func = gpio_event_input_func,
 	.flags = 0,
@@ -12,6 +13,7 @@ static struct gpio_event_input_info keypad_gpio_info = {
 	.keymap_size = ARRAY_SIZE(keypad_zeus_gpio_map),
 	.debounce_time.tv.nsec = 10 * NSEC_PER_MSEC,
 };
+#endif
 
 static struct gpio_event_input_info keypad_pmic_gpio_nwake_info = {
 	.info.func = gpio_event_input_func,
@@ -32,6 +34,7 @@ static struct gpio_event_input_info keypad_pmic_gpio_wake_info = {
 	.debounce_time.tv.nsec = 10 * NSEC_PER_MSEC,
 };
 
+#ifdef CONFIG_INPUT_JOYSTICK
 static struct gpio_event_input_info switch_gpio_info = {
 	.info.func = gpio_event_input_func,
 	.info.no_suspend = 1,
@@ -49,6 +52,8 @@ static struct gpio_event_input_info lidswitch_gpio_info = {
 	.keymap = lidswitch_zeus_gpio_map,
 	.keymap_size = ARRAY_SIZE(lidswitch_zeus_gpio_map),
 };
+#endif
+
 #if defined(CONFIG_PHF_TESTER)
 
 static struct gpio_event_input_info phf_gpio_info = {
@@ -62,11 +67,13 @@ static struct gpio_event_input_info phf_gpio_info = {
 #endif
 
 static struct gpio_event_info *keypad_info[] = {
-	&keypad_gpio_info.info,
 	&keypad_pmic_gpio_wake_info.info,
 	&keypad_pmic_gpio_nwake_info.info,
+#ifdef CONFIG_INPUT_JOYSTICK
 	&switch_gpio_info.info,
 	&lidswitch_gpio_info.info,
+	&keypad_gpio_info.info,
+#endif
 #if defined(CONFIG_PHF_TESTER)
 	&phf_gpio_info.info,
 #endif
@@ -95,9 +102,9 @@ static int keypad_pmic_gpio_config(int gpio)
 	return 0;
 }
 
-
 static int keypad_power(const struct gpio_event_platform_data *pdata, bool on)
 {
+#ifdef CONFIG_INPUT_JOYSTICK
 	int i;
 	int gpio;
 	int mgp;
@@ -131,9 +138,10 @@ static int keypad_power(const struct gpio_event_platform_data *pdata, bool on)
 				       __func__, keypad_zeus_gpio_map[i].gpio);
 		}
 	}
-
+#endif
 	return 0;
 }
+
 
 static struct gpio_event_platform_data keypad_data = {
 	.name		= "keypad-zeus",
@@ -153,12 +161,17 @@ struct platform_device keypad_device_zeus = {
 static int __init keypad_device_init(void)
 {
 	int i;
+#if defined(CONFIG_INPUT_JOYSTICK) || \
+	defined(CONFIG_PHF_TESTER)
 	int rc;
 	int gpio;
 	int mgp;
+#endif
+
 
 	keypad_power(&keypad_data,1);
 
+#ifdef CONFIG_INPUT_JOYSTICK
 	for (i = 0; i < ARRAY_SIZE(switch_zeus_gpio_map); ++i) {
 		gpio = switch_zeus_gpio_map[i].gpio;
 		mgp = GPIO_CFG(gpio,
@@ -171,6 +184,7 @@ static int __init keypad_device_init(void)
 			pr_err("%s: gpio_tlmm_config (gpio=%d), failed\n",
 					__func__, switch_zeus_gpio_map[i].gpio);
 	}
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(keypad_zeus_pmic_gpio_map_nwake); ++i) {
 		keypad_pmic_gpio_config(

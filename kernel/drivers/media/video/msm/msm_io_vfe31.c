@@ -411,7 +411,7 @@ int msm_camio_enable(struct platform_device *pdev)
 	uint32_t val;
 	struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
 	msm_camio_clk_enable(CAMIO_VFE_PBDG_CLK);
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
 #endif /* CONFIG_MACH_SEMC_ZEUS */
 	if (!sinfo->csi_if)
@@ -578,7 +578,7 @@ int msm_camio_probe_on(struct platform_device *pdev)
 	struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
 	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
 	camdev->camera_gpio_on();
-#ifdef CONFIG_MACH_SEMC_ZEUS
+#if defined(CONFIG_MACH_SEMC_ZEUS)
 	return msm_camio_clk_enable(CAMIO_CAM_MCLK_CLK);
 #else
 	return 0;

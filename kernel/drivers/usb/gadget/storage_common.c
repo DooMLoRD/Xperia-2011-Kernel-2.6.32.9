@@ -262,7 +262,7 @@ struct interrupt_data {
 #define ASC(x)		((u8) ((x) >> 8))
 #define ASCQ(x)		((u8) (x))
 
-#define RANDOM_WRITE_COUNT_TO_BE_FLUSHED (10)
+#define RANDOM_WRITE_COUNT_TO_BE_FLUSHED (5)
 
 /* VPD(Vital product data) Page Name */
 #define VPD_SUPPORTED_VPD_PAGES		0x00

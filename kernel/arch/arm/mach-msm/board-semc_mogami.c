@@ -185,8 +185,8 @@
 #define MSM_FB_SIZE		0x500000
 #endif /* CONFIG_FB_MSM_HDMI_SII9024A_PANEL */
 #define MSM_GPU_PHYS_SIZE       SZ_4M
-#define MSM_PMEM_CAMERA_SIZE    0x3200000
-#define MSM_PMEM_ADSP_SIZE      0x1000000
+#define MSM_PMEM_CAMERA_SIZE    0x2F00000
+#define MSM_PMEM_ADSP_SIZE      0x1300000
 #define PMEM_KERNEL_EBI1_SIZE   0x600000
 
 #define PMIC_GPIO_INT		27
@@ -2509,7 +2509,7 @@ static struct cyttsp_platform_data cyttsp_data = {
 	.use_hndshk = 0,
 	.use_timer = 0,
 	.use_sleep = 1,
-	.use_gestures = 1,
+	.use_gestures = 0,
 	.use_load_file = 1,
 	.use_force_fw_update = 0,
 	/* activate up groups */
@@ -3432,14 +3432,17 @@ static struct kgsl_device_platform_data kgsl_3d0_pdata = {
 			{
 				.gpu_freq = 245760000,
 				.bus_freq = 192000000,
+				.io_fraction = 0,
 			},
 			{
 				.gpu_freq = 192000000,
 				.bus_freq = 152000000,
+				.io_fraction = 33,
 			},
 			{
 				.gpu_freq = 192000000,
 				.bus_freq = 0,
+				.io_fraction = 100,
 			},
 		},
 		.init_level = 0,

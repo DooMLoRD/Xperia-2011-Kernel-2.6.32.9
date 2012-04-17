@@ -1091,7 +1091,6 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 				   int id, int x, int y, int wx, int wy, int z)
 {
 	int touch_major, touch_minor;
-	int pressure;
 	struct synaptics_funcarea *funcarea = this->funcarea;
 	struct synaptics_button *button;
 	struct synaptics_pointer previous_pointer;
@@ -1129,13 +1128,12 @@ static int synaptics_funcarea_down(struct synaptics_clearpad *this,
 			  id, pointer->cur.x, pointer->cur.y, wx, wy, z);
 		touch_major = max(wx, wy) + 1;
 		touch_minor = min(wx, wy) + 1;
-		pressure = max(wx, wy) * z / SYNAPTICS_MAX_Z_VALUE + 1;
 		input_report_abs(this->input, ABS_MT_TRACKING_ID, id);
 		input_report_abs(this->input, ABS_MT_POSITION_X,
 				 pointer->cur.x);
 		input_report_abs(this->input, ABS_MT_POSITION_Y,
 				 pointer->cur.y);
-		input_report_abs(this->input, ABS_MT_PRESSURE, pressure);
+		input_report_abs(this->input, ABS_MT_PRESSURE, z);
 		input_report_abs(this->input, ABS_MT_TOUCH_MAJOR, touch_major);
 		input_report_abs(this->input, ABS_MT_TOUCH_MINOR, touch_minor);
 		input_report_abs(this->input, ABS_MT_ORIENTATION, (wx > wy));
