@@ -87,10 +87,8 @@ struct block_header {
 struct xv_pool {
 	ulong flbitmap;
 	ulong slbitmap[MAX_FLI];
-
-        u64 total_pages;        /* stats */
+	u64 total_pages;	/* stats */
 	struct freelist_entry freelist[NUM_FREE_LISTS];
-
 	spinlock_t lock;
 };
 
